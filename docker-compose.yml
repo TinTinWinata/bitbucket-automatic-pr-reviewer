@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  pr-automation:
+    build: .
+    container_name: pr-automation
+    restart: always
+    user: node
+    networks:
+      - traefik-network
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.pr-automation.rule=Host(`bitbucket.tintinwinata.online`)
+      - traefik.http.routers.pr-automation.tls=true
+      - traefik.http.routers.pr-automation.entrypoints=web,websecure
+      - traefik.http.routers.pr-automation.tls.certresolver=mytlschallenge
+      - traefik.http.middlewares.pr-automation.headers.SSLRedirect=true
+      - traefik.http.middlewares.pr-automation.headers.STSSeconds=315360000
+      - traefik.http.middlewares.pr-automation.headers.browserXSSFilter=true
+      - traefik.http.middlewares.pr-automation.headers.contentTypeNosniff=true
+      - traefik.http.middlewares.pr-automation.headers.forceSTSHeader=true
+      - traefik.http.middlewares.pr-automation.headers.SSLHost=tintinwinata.online
+      - traefik.http.middlewares.pr-automation.headers.STSIncludeSubdomains=true
+      - traefik.http.middlewares.pr-automation.headers.STSPreload=true
+      - traefik.http.routers.pr-automation.middlewares=pr-automation@docker
+      - traefik.http.services.pr-automation.loadbalancer.server.port=3000
+    environment:
+      - PORT=3000
+      - CLAUDE_MODEL=${CLAUDE_MODEL:-sonnet}
+      - BITBUCKET_TOKEN=${BITBUCKET_TOKEN}
+      - BITBUCKET_USER=${BITBUCKET_USER}
+      - BITBUCKET_PASSWORD=${BITBUCKET_PASSWORD}
+      - SHELL=/bin/bash
+    env_file:
+      - .env
+    volumes:
+      - ./src:/app/src
+      - ./projects:/app/projects
+      - ./.mcp.json:/app/.mcp.json
+      - ./claude-config/.claude.json:/home/node/.claude.json
+      - ./claude-config/.claude:/home/node/.claude
+
+networks:
+  traefik-network:
+    external: true
+
