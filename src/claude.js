@@ -21,7 +21,8 @@ async function processPullRequest(prData) {
     console.log('\n=== Step 1: Validating Project ===');
     const repoData = {
       name: prData.repository,
-      cloneUrl: prData.repoCloneUrl
+      cloneUrl: prData.repoCloneUrl,
+      sourceBranch: prData.sourceBranch
     };
 
     const projectResult = await ensureProjectExists(repoData);
@@ -58,30 +59,11 @@ Fetch PR details + file diffs from the given Bitbucket URL, safely switch to the
 
 ## Step-by-Step Plan
 
-### 1. Resolve PR Metadata
-- Use Bitbucket MCP tools to fetch repository, PR ID, source & target branches, author, title, description, and changed files.
-- Get full PR diff for context using MCP tools (not shell commands).
-
-### 2. Safe Local Checkout
-\`\`\`bash
-git rev-parse --abbrev-ref HEAD
-git status --porcelain
-git stash push -u -m "pr-auto-stash-${prData.repository}"  # only if dirty
-git fetch --all --prune
-git checkout -B ${prData.sourceBranch} origin/${prData.sourceBranch} || git checkout ${prData.sourceBranch}
-\`\`\`
-
-After review:
-\`\`\`bash
-git checkout <ORIGINAL_BRANCH> || true
-git stash list | grep "pr-auto-stash-${prData.repository}" && git stash pop || true
-\`\`\`
-
-### 3. Review Changes
+### 1. Review Changes
 - Read through all changed files.
 - Identify logic errors, security concerns, performance bottlenecks, missing edge case handling, and lack of tests.
 
-### 4. Post Single PR Summary Comment
+### 2. Post Single PR Summary Comment
 - Use Bitbucket MCP tools to post the summary comment to the PR.
 
 Use this template for the summary if the PR needs to be changed:
@@ -158,16 +140,68 @@ No need to show any others things other then the given template (e.g. \`Key impr
       
       console.log(`Starting Claude analysis with ${model} model (timeout: 5 minutes)...`);
       
-      // Execute Claude CLI with the prompt (with 5 minute timeout)
-      const { stdout, stderr } = await execAsync(
-        `claude --dangerously-skip-permissions -p "$(cat ${promptFile})" --model "${model}" --output-format text`,
-        {
-          maxBuffer: 1024 * 1024 * 10, // 10MB buffer
-          cwd: projectResult.path, // Run in project directory
-          timeout: 5 * 60 * 1000, // 5 minutes timeout
-          killSignal: 'SIGTERM'
-        }
-      );
+      
+      // Set environment variables for the child process
+      const env = {
+        ...process.env,
+        SHELL: '/bin/bash',
+        HOME: '/home/node',
+        PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+      };
+      
+      // Use stdin instead of command substitution to avoid shell issues
+      const { spawn } = require('child_process');
+      
+      const claudeProcess = spawn('claude', [
+        '--dangerously-skip-permissions',
+        '--model', model,
+        '--output-format', 'text'
+      ], {
+        cwd: projectResult.path,
+        env: env,
+        shell: false
+      });
+      
+      // Create a promise to handle the process
+      const result = await new Promise((resolve, reject) => {
+        let stdout = '';
+        let stderr = '';
+        
+        // Set timeout
+        const timeout = setTimeout(() => {
+          claudeProcess.kill('SIGTERM');
+          reject(new Error('Claude analysis timed out after 5 minutes. The PR might be too large or complex.'));
+        }, 5 * 60 * 1000);
+        
+        claudeProcess.stdout.on('data', (data) => {
+          stdout += data.toString();
+        });
+        
+        claudeProcess.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+        
+        claudeProcess.on('close', (code) => {
+          clearTimeout(timeout);
+          if (code === 0) {
+            resolve({ stdout, stderr });
+          } else {
+            reject(new Error(`Claude CLI exited with code ${code}: ${stderr}`));
+          }
+        });
+        
+        claudeProcess.on('error', (error) => {
+          clearTimeout(timeout);
+          reject(error);
+        });
+        
+        // Send the prompt via stdin
+        const promptContent = fs.readFileSync(promptFile, 'utf8');
+        claudeProcess.stdin.write(promptContent);
+        claudeProcess.stdin.end();
+      });
+      
+      const { stdout, stderr } = result;
 
       const duration = ((Date.now() - startTime) / 1000).toFixed(2);
       console.log(`✓ Claude analysis completed in ${duration}s`);

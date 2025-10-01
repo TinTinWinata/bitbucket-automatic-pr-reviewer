@@ -65,7 +65,7 @@ async function cloneRepository(repoUrl, projectName) {
  * @param {string} branch - Branch to checkout and pull (optional)
  * @returns {Promise<Object>} - Result with success status
  */
-async function updateRepository(projectName, branch = null) {
+async function updateRepository(projectName, branch) {
   try {
     const projectPath = path.join(PROJECTS_DIR, projectName);
 
@@ -77,6 +77,8 @@ async function updateRepository(projectName, branch = null) {
 
     // Fetch latest changes (credentials are handled by Git's credential helper)
     await execAsync(`git -C "${projectPath}" fetch --all`);
+
+    console.log('Branch: ', branch)
 
     // Checkout branch if specified
     if (branch) {
@@ -116,7 +118,7 @@ async function ensureProjectExists(repoData) {
     
     // Optionally update the repository
     try {
-      await updateRepository(projectName);
+      await updateRepository(projectName, repoData.sourceBranch);
       return {
         success: true,
         path: path.join(PROJECTS_DIR, projectName),
