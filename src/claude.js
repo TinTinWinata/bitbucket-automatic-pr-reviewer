@@ -254,7 +254,7 @@ No need to show any others things other then the given template (e.g. \`Key impr
       // Track successful review
       metrics.claudeReviewSuccessCounter.inc({ repository });
       metrics.claudeReviewDurationHistogram.observe({ repository, status: 'success' }, parseFloat(duration));
-      erconsole.log(`Metrics: Incremented successful review counter for ${repository}`);
+      console.log(`Metrics: Incremented successful review counter for ${repository}`);
       
       // Track LGTM or Issues
       if (isLgtm) {
