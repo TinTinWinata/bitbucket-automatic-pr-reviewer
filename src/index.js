@@ -1,5 +1,6 @@
 const express = require('express');
 const dotenv = require('dotenv');
+const crypto = require('crypto');
 const { processPullRequest } = require('./claude');
 const { register, metrics } = require('./metrics');
 
@@ -8,8 +9,87 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware to parse JSON
-app.use(express.json());
+// Security Configuration
+const BITBUCKET_WEBHOOK_SECRET = process.env.BITBUCKET_WEBHOOK_SECRET;
+const ALLOWED_WORKSPACE = process.env.ALLOWED_WORKSPACE || 'xriopteam'; // Default to xriopteam
+
+// Middleware to parse JSON (but keep raw body for signature verification)
+app.use(express.json({
+  verify: (req, res, buf, encoding) => {
+    // Store raw body for signature verification
+    req.rawBody = buf.toString(encoding || 'utf8');
+  }
+}));
+
+/**
+ * Verify Bitbucket webhook signature
+ * @param {string} signature - Signature from X-Hub-Signature header
+ * @param {string} payload - Raw request body
+ * @param {string} secret - Webhook secret
+ * @returns {boolean} - True if signature is valid
+ */
+function verifyBitbucketSignature(signature, payload, secret) {
+  if (!signature || !secret) {
+    return false;
+  }
+
+  // Bitbucket uses SHA256 HMAC
+  // Format: "sha256=<hash>"
+  const hmac = crypto.createHmac('sha256', secret);
+  hmac.update(payload, 'utf8');
+  const expectedSignature = 'sha256=' + hmac.digest('hex');
+
+  // Use timing-safe comparison to prevent timing attacks
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(expectedSignature)
+  );
+}
+
+/**
+ * Middleware to validate Bitbucket webhook
+ */
+function validateBitbucketWebhook(req, res, next) {
+  // 1. Verify webhook signature (if secret is configured)
+  if (BITBUCKET_WEBHOOK_SECRET) {
+    const signature = req.headers['x-hub-signature'];
+    
+    if (!signature) {
+      console.warn('⚠️  Webhook rejected: Missing X-Hub-Signature header');
+      return res.status(401).json({ 
+        error: 'Unauthorized',
+        message: 'Missing webhook signature' 
+      });
+    }
+
+    if (!verifyBitbucketSignature(signature, req.rawBody, BITBUCKET_WEBHOOK_SECRET)) {
+      console.warn('⚠️  Webhook rejected: Invalid signature');
+      return res.status(401).json({ 
+        error: 'Unauthorized',
+        message: 'Invalid webhook signature' 
+      });
+    }
+
+    console.log('✅ Webhook signature verified');
+  } else {
+    console.warn('⚠️  WARNING: BITBUCKET_WEBHOOK_SECRET not configured - signature validation disabled');
+  }
+
+  // 2. Verify workspace (organization)
+  const workspace = req.body.repository?.workspace?.slug || 
+                    req.body.repository?.owner?.username;
+  
+  if (workspace && workspace !== ALLOWED_WORKSPACE) {
+    console.warn(`⚠️  Webhook rejected: Unauthorized workspace "${workspace}" (expected "${ALLOWED_WORKSPACE}")`);
+    return res.status(403).json({ 
+      error: 'Forbidden',
+      message: `Webhooks only accepted from ${ALLOWED_WORKSPACE} workspace` 
+    });
+  }
+
+  console.log(`✅ Workspace verified: ${workspace || 'unknown'}`);
+  next();
+}
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -28,8 +108,8 @@ app.get('/metrics', async (req, res) => {
   }
 });
 
-// Bitbucket webhook endpoint for PR creation
-app.post('/webhook/bitbucket/pr', async (req, res) => {
+// Bitbucket webhook endpoint for PR creation (with security validation)
+app.post('/webhook/bitbucket/pr', validateBitbucketWebhook, async (req, res) => {
   try {
     console.log('Received Bitbucket PR webhook');
     console.log('Event:', req.headers['x-event-key']);
@@ -37,12 +117,12 @@ app.post('/webhook/bitbucket/pr', async (req, res) => {
     const eventKey = req.headers['x-event-key'];
     
     // Check if it's a PR created event
-    if (eventKey !== 'pullrequest:created') {
-      return res.status(200).json({ 
-        message: 'Event ignored (not a PR creation)',
-        event: eventKey 
-      });
-    }
+    // if (eventKey !== 'pullrequest:created') {
+    //   return res.status(200).json({ 
+    //     message: 'Event ignored (not a PR creation)',
+    //     event: eventKey 
+    //   });
+    // }
 
     const payload = req.body;
     const repository = payload.repository?.name || 'unknown';
