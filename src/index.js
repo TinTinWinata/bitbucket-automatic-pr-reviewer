@@ -1,6 +1,7 @@
 const express = require('express');
 const dotenv = require('dotenv');
 const { processPullRequest } = require('./claude');
+const { register, metrics } = require('./metrics');
 
 dotenv.config();
 
@@ -13,6 +14,18 @@ app.use(express.json());
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'PR Automation service is running' });
+});
+
+// Prometheus metrics endpoint
+app.get('/metrics', async (req, res) => {
+  try {
+    res.set('Content-Type', register.contentType);
+    const metricsData = await register.metrics();
+    res.end(metricsData);
+  } catch (error) {
+    console.error('Error collecting metrics:', error);
+    res.status(500).end(error.message);
+  }
 });
 
 // Bitbucket webhook endpoint for PR creation
@@ -32,6 +45,7 @@ app.post('/webhook/bitbucket/pr', async (req, res) => {
     }
 
     const payload = req.body;
+    const repository = payload.repository?.name || 'unknown';
     
     // Extract relevant PR information
     const prData = {
@@ -47,6 +61,15 @@ app.post('/webhook/bitbucket/pr', async (req, res) => {
     };
 
     console.log('PR Data:', prData);
+
+    // Track PR metrics based on event type
+    if (eventKey === 'pullrequest:created') {
+      metrics.prCreatedCounter.inc({ repository });
+      console.log(`Metrics: Incremented PR created counter for ${repository}`);
+    } else if (eventKey === 'pullrequest:updated') {
+      metrics.prUpdatedCounter.inc({ repository });
+      console.log(`Metrics: Incremented PR updated counter for ${repository}`);
+    }
 
     // Acknowledge receipt immediately
     res.status(200).json({ 

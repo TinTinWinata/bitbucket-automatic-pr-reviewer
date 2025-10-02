@@ -3,6 +3,7 @@ const { promisify } = require('util');
 const fs = require('fs');
 const path = require('path');
 const { ensureProjectExists } = require('./git');
+const { metrics } = require('./metrics');
 
 const execAsync = promisify(exec);
 
@@ -11,6 +12,9 @@ const execAsync = promisify(exec);
  * @param {Object} prData - Pull request data from Bitbucket webhook
  */
 async function processPullRequest(prData) {
+  const repository = prData.repository;
+  const startTime = Date.now();
+  
   try {
     console.log('Processing PR with Claude...');
     console.log(`PR Title: ${prData.title}`);
@@ -79,9 +83,9 @@ Use this template for the summary if the PR needs to be changed:
 
 ## Issues:
 
-### 1) <title>
+1. **<Issue Title>** - <brief description>
 
-*<explanation>*
+*<detailed explanation>*
 
 **Existing Code**:
 
@@ -93,11 +97,15 @@ Use this template for the summary if the PR needs to be changed:
 
 ---
 
-2) ...
+2. **<Issue Title>** - <brief description>
+
+*<detailed explanation>*
 
 ---
 
-3) ...
+3. **<Issue Title>** - <brief description>
+
+*<detailed explanation>*
 
 \`\`\`
 
@@ -174,11 +182,16 @@ No need to show any others things other then the given template (e.g. \`Key impr
         }, 5 * 60 * 1000);
         
         claudeProcess.stdout.on('data', (data) => {
-          stdout += data.toString();
+          const chunk = data.toString();
+          stdout += chunk;
+          // Log progress (optional, can be removed if too verbose)
+          process.stdout.write(chunk);
         });
         
         claudeProcess.stderr.on('data', (data) => {
-          stderr += data.toString();
+          const chunk = data.toString();
+          stderr += chunk;
+          process.stderr.write(chunk);
         });
         
         claudeProcess.on('close', (code) => {
@@ -186,7 +199,11 @@ No need to show any others things other then the given template (e.g. \`Key impr
           if (code === 0) {
             resolve({ stdout, stderr });
           } else {
-            reject(new Error(`Claude CLI exited with code ${code}: ${stderr}`));
+            // Log both stdout and stderr to help debug
+            console.error('Claude CLI failed with code:', code);
+            if (stderr) console.error('STDERR:', stderr);
+            if (stdout) console.error('STDOUT:', stdout);
+            reject(new Error(`Claude CLI exited with code ${code}: ${stderr || stdout || 'No error output'}`));
           }
         });
         
@@ -210,11 +227,45 @@ No need to show any others things other then the given template (e.g. \`Key impr
         console.warn('Claude CLI warnings:', stderr);
       }
 
-      console.log('\nClaude CLI Response:');
-      console.log(stdout);
-      console.log('======================================\n');
-
       fs.unlinkSync(promptFile);
+
+      // Analyze the response to track metrics
+      const isLgtm = stdout.includes('✅ LGTM') || stdout.includes('LGTM');
+      
+      // Count the actual number of issues found by parsing the response
+      // Look for numbered issues in various formats: "1)", "1.", "### 1)", etc.
+      let issueCount = 0;
+      if (stdout.includes('🚨 Possibility Issue') || stdout.includes('Issues:')) {
+        // Match patterns like:
+        // - "1. **Title**" (markdown numbered list)
+        // - "1) Title" (parentheses format)
+        // - "### 1) Title" or "### 1. Title" (with headers)
+        const issueMatches = stdout.match(/(?:^|\n)(?:###\s*)?\d+[.)]\s+/gm);
+        if (issueMatches) {
+          issueCount = issueMatches.length;
+          console.log(`Found ${issueCount} issues in Claude response`);
+        } else {
+          // Fallback: if no numbered format found but has issues marker, count as 1
+          console.log('Issues detected but could not parse count, defaulting to 1');
+          issueCount = 1;
+        }
+      }
+      
+      // Track successful review
+      metrics.claudeReviewSuccessCounter.inc({ repository });
+      metrics.claudeReviewDurationHistogram.observe({ repository, status: 'success' }, parseFloat(duration));
+      erconsole.log(`Metrics: Incremented successful review counter for ${repository}`);
+      
+      // Track LGTM or Issues
+      if (isLgtm) {
+        metrics.claudeLgtmCounter.inc({ repository });
+        console.log(`Metrics: Incremented LGTM counter for ${repository}`);
+      }
+      
+      if (issueCount > 0) {
+        metrics.claudeIssuesCounter.inc({ repository }, issueCount);
+        console.log(`Metrics: Incremented issues found counter by ${issueCount} for ${repository}`);
+      }
 
       return {
         success: true,
@@ -239,6 +290,17 @@ No need to show any others things other then the given template (e.g. \`Key impr
 
   } catch (error) {
     console.error('Error executing Claude CLI:', error);
+    
+    // Track failed review
+    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+    const errorType = error.message.includes('timeout') ? 'timeout' : 
+                      error.message.includes('clone') ? 'git_error' : 
+                      'unknown';
+    
+    metrics.claudeReviewFailureCounter.inc({ repository, error_type: errorType });
+    metrics.claudeReviewDurationHistogram.observe({ repository, status: 'failure' }, parseFloat(duration));
+    console.log(`Metrics: Incremented failed review counter for ${repository} (error: ${errorType})`);
+    
     throw error;
   }
 }

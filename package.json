@@ -7,15 +7,20 @@
     "start": "node src/index.js",
     "dev": "nodemon src/index.js"
   },
-  "keywords": ["bitbucket", "webhook", "claude", "automation"],
+  "keywords": [
+    "bitbucket",
+    "webhook",
+    "claude",
+    "automation"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "dotenv": "^16.3.1",
     "express": "^4.18.2",
-    "dotenv": "^16.3.1"
+    "prom-client": "^15.1.3"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
   }
 }
-
