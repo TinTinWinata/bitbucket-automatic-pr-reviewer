@@ -122,7 +122,26 @@ The implementation follows best practices, and the changes are ready to be merge
 
 \`\`\`
 
-No need to show any others things other then the given template (e.g. \`Key improvements\` or \`Technical details\`)`;
+No need to show any others things other then the given template (e.g. \`Key improvements\` or \`Technical details\`)
+
+---
+
+## Final Step: Output Metrics
+
+After posting the PR comment, you MUST output a JSON block for metrics tracking in this exact format:
+
+\`\`\`json
+{
+  "isLgtm": true/false,
+  "issueCount": <number>
+}
+\`\`\`
+
+Where:
+- \`isLgtm\`: true if no issues found, false if issues were identified
+- \`issueCount\`: exact number of issues found (0 if LGTM)
+
+This JSON must be the last thing in your response.`;
 
     // Write prompt to temporary file
     const promptFile = path.join('/tmp', `pr-review-${Date.now()}.txt`);
@@ -229,43 +248,26 @@ No need to show any others things other then the given template (e.g. \`Key impr
 
       fs.unlinkSync(promptFile);
 
-      // Analyze the response to track metrics
-      const isLgtm = stdout.includes('✅ LGTM') || stdout.includes('LGTM');
-      
-      // Count the actual number of issues found by parsing the response
-      // Look for numbered issues in various formats: "1)", "1.", "### 1)", etc.
+      // Extract metrics from JSON output
+      let isLgtm = false;
       let issueCount = 0;
       
-      // Check if this is a review with issues (multiple detection methods)
-      const hasIssuesMarker = stdout.includes('🚨 Possibility Issue') || 
-                             stdout.includes('Issues:') || 
-                             /\d+\s+(?:critical\s+)?issues?/i.test(stdout) || // "6 critical issues" or "3 issues"
-                             /identifying\s+\d+\s+issues?/i.test(stdout); // "identifying 6 issues"
+      // Look for JSON block in the response (should be at the end)
+      const jsonMatch = stdout.match(/```json\s*\n\s*({[\s\S]*?})\s*\n\s*```/);
       
-      if (hasIssuesMarker && !isLgtm) {
-        // Try to extract issue count from text like "6 critical issues" or "identifying 5 issues"
-        const issueCountMatch = stdout.match(/(?:found|identifying)\s+(\d+)\s+(?:critical\s+)?issues?/i);
-        
-        if (issueCountMatch) {
-          // Found explicit issue count in text
-          issueCount = parseInt(issueCountMatch[1], 10);
-          console.log(`Found ${issueCount} issues from text: "${issueCountMatch[0]}"`);
-        } else {
-          // Count numbered list items as fallback
-          // Match patterns like:
-          // - "1. **Title**" (markdown numbered list)
-          // - "1) Title" (parentheses format)
-          // - "### 1) Title" or "### 1. Title" (with headers)
-          const issueMatches = stdout.match(/(?:^|\n)\s*\d+[.)]\s+\*\*[^*]+\*\*/gm);
-          if (issueMatches) {
-            issueCount = issueMatches.length;
-            console.log(`Found ${issueCount} issues by counting numbered list items`);
-          } else {
-            // Last fallback: if issues detected but can't parse count
-            console.log('Issues detected but could not parse count, defaulting to 1');
-            issueCount = 1;
-          }
+      if (jsonMatch && jsonMatch[1]) {
+        try {
+          const reviewMetrics = JSON.parse(jsonMatch[1]);
+          isLgtm = reviewMetrics.isLgtm === true;
+          issueCount = typeof reviewMetrics.issueCount === 'number' ? reviewMetrics.issueCount : 0;
+          console.log(`✓ Parsed metrics from JSON: isLgtm=${isLgtm}, issueCount=${issueCount}`);
+        } catch (parseError) {
+          console.error('Error parsing metrics JSON:', parseError.message);
+          throw new Error(`Failed to parse metrics JSON: ${parseError.message}`);
         }
+      } else {
+        console.error('❌ No JSON metrics found in Claude response');
+        throw new Error('Claude did not return metrics in the expected JSON format');
       }
       
       // Track successful review
