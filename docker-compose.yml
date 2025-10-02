@@ -32,6 +32,7 @@ services:
       - BITBUCKET_PASSWORD=${BITBUCKET_PASSWORD}
       - BITBUCKET_WEBHOOK_SECRET=${BITBUCKET_WEBHOOK_SECRET}
       - ALLOWED_WORKSPACE=${ALLOWED_WORKSPACE:-xriopteam}
+      - PROCESS_ONLY_CREATED=${PROCESS_ONLY_CREATED:-false}
       - SHELL=/bin/bash
     env_file:
       - .env

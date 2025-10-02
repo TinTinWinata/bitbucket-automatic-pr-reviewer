@@ -13,6 +13,11 @@ const PORT = process.env.PORT || 3000;
 const BITBUCKET_WEBHOOK_SECRET = process.env.BITBUCKET_WEBHOOK_SECRET;
 const ALLOWED_WORKSPACE = process.env.ALLOWED_WORKSPACE || 'xriopteam'; // Default to xriopteam
 
+// Event Filtering Configuration
+// Set to 'true' to only process PR creation events (ignore updates)
+// Set to 'false' to process all PR events (created + updated)
+const PROCESS_ONLY_CREATED = process.env.PROCESS_ONLY_CREATED === 'true';
+
 // Queue System for Processing PRs (prevents branch conflicts)
 const reviewQueue = [];
 let isProcessing = false;
@@ -143,13 +148,14 @@ app.post('/webhook/bitbucket/pr', validateBitbucketWebhook, async (req, res) => 
 
     const eventKey = req.headers['x-event-key'];
     
-    // Check if it's a PR created event
-    // if (eventKey !== 'pullrequest:created') {
-    //   return res.status(200).json({ 
-    //     message: 'Event ignored (not a PR creation)',
-    //     event: eventKey 
-    //   });
-    // }
+    // Check if event should be processed based on configuration
+    if (PROCESS_ONLY_CREATED && eventKey !== 'pullrequest:created') {
+      console.log(`⏭️  Event ignored (only processing PR creation): ${eventKey}`);
+      return res.status(200).json({ 
+        message: 'Event ignored (only processing PR creation)',
+        event: eventKey 
+      });
+    }
 
     const payload = req.body;
     const repository = payload.repository?.name || 'unknown';
@@ -203,5 +209,6 @@ app.post('/webhook/bitbucket/pr', validateBitbucketWebhook, async (req, res) => 
 app.listen(PORT, () => {
   console.log(`PR Automation server listening on port ${PORT}`);
   console.log(`Webhook endpoint: http://localhost:${PORT}/webhook/bitbucket/pr`);
+  console.log(`Event filtering: ${PROCESS_ONLY_CREATED ? 'Only PR creation events' : 'All PR events (created + updated)'}`);
 });
 
