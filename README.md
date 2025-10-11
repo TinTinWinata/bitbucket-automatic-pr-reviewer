@@ -5,12 +5,14 @@ A simple Docker-based automation service that receives Bitbucket pull request we
 ## Features
 
 - 🔗 Receives Bitbucket PR creation webhooks
+- 🔒 Webhook signature validation & workspace restriction (xriopteam)
 - 📦 Automatically clones repositories if not already present
 - 🔄 Updates existing repositories before processing
 - 🤖 Processes PR data with Claude CLI (`--dangerously-skip-permissions`)
 - 🐳 Fully containerized with Docker
 - ⚡ Express.js REST API
 - 📝 Easy configuration with environment variables
+- 📊 Prometheus metrics integration for monitoring
 
 ## Prerequisites
 
@@ -42,6 +44,10 @@ Edit `.env` and add your credentials:
 # Claude Model (haiku, sonnet, or opus)
 CLAUDE_MODEL=sonnet
 
+# Security: Webhook Validation (REQUIRED)
+BITBUCKET_WEBHOOK_SECRET=your-webhook-secret-here
+ALLOWED_WORKSPACE=xriopteam
+
 # Required: Bitbucket Authentication (choose one method)
 # Option 1: Use App Password or Token (recommended)
 BITBUCKET_TOKEN=your-bitbucket-app-password
@@ -50,11 +56,35 @@ BITBUCKET_TOKEN=your-bitbucket-app-password
 # BITBUCKET_USER=your-username
 # BITBUCKET_PASSWORD=your-password
 
+# Event Filtering (Optional)
+# Set to 'true' to only process PR creation events (ignore updates)
+# Set to 'false' to process all PR events (created + updated)
+PROCESS_ONLY_CREATED=false
+
 # Optional
 PORT=3000
 ```
 
-### 3. Create Bitbucket App Password
+### 3. Configure Claude Authentication
+
+To enable Claude CLI authentication and authorization, you need to copy your Claude configuration files to the `./claude-config` directory:
+
+```bash
+# Create the claude-config directory
+mkdir -p ./claude-config
+
+# Copy your Claude configuration files
+cp ~/.claude.json ./claude-config/
+cp -r ~/.claude ./claude-config/
+```
+
+**Purpose**: These files contain your Claude CLI authentication/authorization data, allowing the Docker container to access Claude without requiring interactive login.
+
+**Note**: The Docker Compose configuration mounts these files into the container:
+- `./claude-config/.claude.json` → `/home/node/.claude.json`
+- `./claude-config/.claude` → `/home/node/.claude`
+
+### 4. Create Bitbucket App Password
 
 1. Go to Bitbucket → Personal Settings → App passwords
 2. Click "Create app password"
@@ -62,7 +92,7 @@ PORT=3000
 4. Permissions: Select `Repositories: Read` and `Pull requests: Read`
 5. Copy the generated password and use it as `BITBUCKET_TOKEN`
 
-### 4. Build and Run with Docker
+### 5. Build and Run with Docker
 
 ```bash
 # Build the Docker image (includes Claude CLI installation)
@@ -77,7 +107,7 @@ docker-compose logs -f
 
 The service will be available at `http://localhost:3000`
 
-### 5. Configure Bitbucket Webhook
+### 6. Configure Bitbucket Webhook
 
 1. Go to your Bitbucket repository settings
 2. Navigate to **Webhooks** section
@@ -326,6 +356,9 @@ The system automatically handles git operations:
 | `BITBUCKET_TOKEN` | Yes* | - | Bitbucket App Password or Token |
 | `BITBUCKET_USER` | Yes* | - | Bitbucket username (if not using token) |
 | `BITBUCKET_PASSWORD` | Yes* | - | Bitbucket password (if not using token) |
+| `BITBUCKET_WEBHOOK_SECRET` | Recommended | - | Webhook signature validation secret |
+| `ALLOWED_WORKSPACE` | No | `xriopteam` | Bitbucket workspace/organization slug to accept webhooks from |
+| `PROCESS_ONLY_CREATED` | No | `false` | Set to `true` to only process PR creation events (ignore updates) |
 | `PORT` | No | `3000` | Server port |
 
 \* Use either `BITBUCKET_TOKEN` or `BITBUCKET_USER` + `BITBUCKET_PASSWORD`
@@ -382,6 +415,71 @@ docker-compose down
 rm -rf projects/*
 docker-compose restart
 ```
+
+## Webhook Security
+
+The webhook endpoint is secured with two layers of protection:
+
+### 1. Signature Validation
+All webhook requests must include a valid HMAC-SHA256 signature in the `X-Hub-Signature` header. This ensures requests actually come from Bitbucket.
+
+### 2. Workspace Restriction
+Only webhooks from the `xriopteam` Bitbucket workspace are accepted. This prevents unauthorized access from other organizations.
+
+### Setup
+
+1. **Generate a webhook secret:**
+   ```bash
+   openssl rand -hex 32
+   ```
+
+2. **Add to `.env` file:**
+   ```env
+   BITBUCKET_WEBHOOK_SECRET=your-generated-secret
+   ALLOWED_WORKSPACE=xriopteam
+   ```
+
+3. **Configure in Bitbucket:**
+   - Go to Repository Settings → Webhooks
+   - Add webhook URL: `https://bitbucket.tintinwinata.online/webhook/bitbucket/pr`
+   - Add the same secret in the "Secret" field
+   - Select triggers: PR Created, PR Updated
+
+4. **Restart service:**
+   ```bash
+   docker compose restart pr-automation
+   ```
+
+**📖 See [WEBHOOK_SECURITY.md](./WEBHOOK_SECURITY.md) for detailed configuration and troubleshooting.**
+
+## Monitoring with Prometheus
+
+The application exposes Prometheus metrics at `/metrics` endpoint for monitoring PR automation activities and Claude review performance.
+
+### Available Metrics
+
+- **PR Created**: `pr_created_total` - Number of PRs created
+- **PR Updated**: `pr_updated_total` - Number of PRs updated  
+- **LGTM Count**: `claude_lgtm_total` - Number of approvals from Claude
+- **Issues Found**: `claude_issues_found_total` - Total count of all issues found (e.g., if 1 PR has 3 issues, adds 3 to counter)
+- **Successful Reviews**: `claude_review_success_total` - PRs successfully reviewed
+- **Failed Reviews**: `claude_review_failure_total` - Failed reviews (with error types)
+- **Review Duration**: `claude_review_duration_seconds` - Histogram of review durations
+
+### Access Metrics
+
+```bash
+curl http://localhost:3000/metrics
+```
+
+### Detailed Documentation
+
+See [PROMETHEUS.md](./PROMETHEUS.md) for:
+- Detailed metric descriptions
+- Grafana dashboard examples
+- Sample PromQL queries
+
+**Note**: Prometheus is already configured in `/workspace/monitoring/prometheus.yml` to scrape metrics from `pr-automation:3000`.
 
 ## Common Issues
 
