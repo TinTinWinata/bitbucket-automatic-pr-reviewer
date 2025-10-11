@@ -480,3 +480,34 @@ See [PROMETHEUS.md](./PROMETHEUS.md) for:
 - Sample PromQL queries
 
 **Note**: Prometheus is already configured in `/workspace/monitoring/prometheus.yml` to scrape metrics from `pr-automation:3000`.
+
+## Contributing
+
+Feel free to contribute to this project! Whether you want to:
+
+- 🐛 **Report bugs** or issues
+- 💡 **Suggest new features** or improvements  
+- 🔧 **Submit pull requests** with fixes or enhancements
+- 📖 **Improve documentation** or examples
+- 🧪 **Add tests** or improve existing ones
+
+### Getting Started
+
+1. **Fork the repository**
+2. **Create a feature branch**: `git checkout -b feature/your-feature-name`
+3. **Make your changes** and test them thoroughly
+4. **Commit your changes**: `git commit -m "Add your feature"`
+5. **Push to your fork**: `git push origin feature/your-feature-name`
+6. **Open a Pull Request**
+
+### Questions or Discussion?
+
+I'm always open to discussing issues, reviewing PRs, or just chatting about the project! 
+
+**Feel free to DM me on LinkedIn** - I'd love to hear from you and help with any questions you might have.
+
+[LinkedIn Profile](https://linkedin.com/in/tintinwinata)
+
+---
+
+**Happy coding! 🚀**
