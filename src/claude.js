@@ -267,7 +267,9 @@ This JSON must be the last thing in your response.`;
         }
       } else {
         console.error('❌ No JSON metrics found in Claude response');
-        throw new Error('Claude did not return metrics in the expected JSON format');
+        // Default to conservative metrics
+        isLgtm = false;
+        issueCount = 0;
       }
       
       // Track successful review
