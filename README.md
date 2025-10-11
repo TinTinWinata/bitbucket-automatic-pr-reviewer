@@ -228,61 +228,6 @@ Review the pull request changes and provide a comprehensive code review.
 Please provide your code review.`;
 ```
 
-### Example: Jenkins-Style Prompt
-
-You can use a prompt similar to your Jenkins pipeline:
-
-```javascript
-const prompt = `**Role:**  
-You are an autonomous code reviewer with terminal access.
-
-**Goal:**  
-Fetch PR details, safely switch to the PR branch, review changes, and provide analysis.
-
-**PR:**  
-${prData.prUrl}
-
----
-
-## Operating Rules
-- Use terminal for safe git operations: stash, checkout branch, restore previous state.
-- Be idempotent: always restore original branch and pop stash if needed.
-
-## Step-by-Step Plan
-
-### 1. Safe Local Checkout
-\`\`\`bash
-git rev-parse --abbrev-ref HEAD
-git status --porcelain
-git stash push -u -m "pr-auto-stash"  # only if dirty
-git fetch --all --prune
-git checkout -B ${prData.sourceBranch} origin/${prData.sourceBranch}
-\`\`\`
-
-### 2. Review Changes
-- Read through all changed files
-- Identify logic errors, security concerns, performance issues
-- Check for missing edge case handling and tests
-
-### 3. Restore Original State
-\`\`\`bash
-git checkout - || true
-git stash pop || true
-\`\`\`
-
-### 4. Provide Summary
-
-Use this template:
-
-# PR Review Summary
-
-## Status: [✅ LGTM | 🚨 Issues Found]
-
-*<1-2 sentences about what the PR changes>*
-
-[Your analysis here]
-`;
-```
 
 ## Development
 
