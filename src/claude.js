@@ -165,7 +165,7 @@ This JSON must be the last thing in your response.`;
       // Get model from env or default to sonnet
       const model = process.env.CLAUDE_MODEL || 'sonnet';
       
-      console.log(`Starting Claude analysis with ${model} model (timeout: 5 minutes)...`);
+      console.log(`Starting Claude analysis with ${model} model (timeout: 10 minutes)...`);
       
       
       // Set environment variables for the child process
@@ -197,8 +197,8 @@ This JSON must be the last thing in your response.`;
         // Set timeout
         const timeout = setTimeout(() => {
           claudeProcess.kill('SIGTERM');
-          reject(new Error('Claude analysis timed out after 5 minutes. The PR might be too large or complex.'));
-        }, 5 * 60 * 1000);
+          reject(new Error('Claude analysis timed out after 10 minutes. The PR might be too large or complex.'));
+        }, 10 * 60 * 1000);
         
         claudeProcess.stdout.on('data', (data) => {
           const chunk = data.toString();
@@ -302,8 +302,8 @@ This JSON must be the last thing in your response.`;
       
       // Check if it's a timeout error
       if (error.killed || error.signal === 'SIGTERM') {
-        console.error('❌ Claude CLI timed out after 5 minutes');
-        throw new Error('Claude analysis timed out after 5 minutes. The PR might be too large or complex.');
+        console.error('❌ Claude CLI timed out after 10 minutes');
+        throw new Error('Claude analysis timed out after 10 minutes. The PR might be too large or complex.');
       }
       
       throw error;
