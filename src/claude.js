@@ -155,6 +155,8 @@ async function processPullRequest(prData) {
       // Extract metrics from JSON output
       let isLgtm = false;
       let issueCount = 0;
+      let isReviewFailed = false;
+      let failedReviewReason = null;
       
       // Look for JSON block in the response (should be at the end)
       const jsonMatch = stdout.match(/```json\s*\n\s*({[\s\S]*?})\s*\n\s*```/);
@@ -164,7 +166,9 @@ async function processPullRequest(prData) {
           const reviewMetrics = JSON.parse(jsonMatch[1]);
           isLgtm = reviewMetrics.isLgtm === true;
           issueCount = typeof reviewMetrics.issueCount === 'number' ? reviewMetrics.issueCount : 0;
-          logger.info(`✓ Parsed metrics from JSON: isLgtm=${isLgtm}, issueCount=${issueCount}`);
+          isReviewFailed = reviewMetrics.isReviewFailed === true;
+          failedReviewReason = reviewMetrics.failedReviewReason || null;
+          logger.info(`✓ Parsed metrics from JSON: isLgtm=${isLgtm}, issueCount=${issueCount}, isReviewFailed=${isReviewFailed}, failedReviewReason=${failedReviewReason}`);
         } catch (parseError) {
           logger.error('Error parsing metrics JSON:', parseError.message);
           throw new Error(`Failed to parse metrics JSON: ${parseError.message}`);
@@ -174,12 +178,22 @@ async function processPullRequest(prData) {
         // Default to conservative metrics
         isLgtm = false;
         issueCount = 0;
+        isReviewFailed = false;
+        failedReviewReason = null;
       }
       
-      // Track successful review
-      metrics.claudeReviewSuccessCounter.inc({ repository });
-      metrics.claudeReviewDurationHistogram.observe({ repository, status: 'success' }, parseFloat(duration));
-      logger.debug(`Metrics: Incremented successful review counter for ${repository}`);
+      // Track review failure if indicated by Claude
+      if (isReviewFailed) {
+        const errorType = failedReviewReason ? 'claude_reported' : 'unknown';
+        metrics.claudeReviewFailureCounter.inc({ repository, error_type: errorType });
+        logger.error(`Claude reported review failure: ${failedReviewReason || 'No reason provided'}`);
+        logger.debug(`Metrics: Incremented failed review counter for ${repository} (error: ${errorType})`);
+      } else {
+        // Track successful review
+        metrics.claudeReviewSuccessCounter.inc({ repository });
+        metrics.claudeReviewDurationHistogram.observe({ repository, status: 'success' }, parseFloat(duration));
+        logger.debug(`Metrics: Incremented successful review counter for ${repository}`);
+      }
       
       // Track LGTM or Issues
       if (isLgtm) {
