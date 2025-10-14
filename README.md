@@ -194,40 +194,63 @@ Receives Bitbucket pull request creation webhooks.
 }
 ```
 
-## Customizing the Claude Prompt
+## Customizing PR Review Templates
 
-Edit `src/claude.js` and modify the `prompt` variable in the `processPullRequest` function (around line 42):
+The system supports modular templates for customizing review behavior without code changes.
 
-```javascript
-const prompt = `**Role:**  
-You are an autonomous code reviewer with terminal access.
+### Quick Template Setup
 
-**Goal:**  
-Review the pull request changes and provide a comprehensive code review.
-
-**PR Details:**
-- Title: ${prData.title}
-- Description: ${prData.description}
-- Author: ${prData.author}
-- Source Branch: ${prData.sourceBranch}
-- Destination Branch: ${prData.destinationBranch}
-- Repository: ${prData.repository}
-- PR URL: ${prData.prUrl}
-- Project Path: ${projectResult.path}
-
----
-
-[Add your custom instructions here]
-
-## Instructions:
-1. Navigate to the project directory
-2. Review the changes between branches
-3. Identify any issues, bugs, or improvements
-4. Provide a summary of your findings
-
-Please provide your code review.`;
+**1. Create a custom template:**
+```bash
+touch src/templates/custom/my-review.md
 ```
 
+**2. Write your template with variables:**
+```markdown
+**Role:** You are a security-focused code reviewer.
+**Goal:** Review {{repository}} for vulnerabilities.
+**PR:** `{{prUrl}}`
+
+## Security Checklist
+- Check for SQL injection
+- Verify input validation
+- Review authentication logic
+
+## Final Step: Output Metrics
+```json
+{"isLgtm": true/false, "issueCount": 0}
+```
+
+**3. Map repository to template:**
+
+```json
+// src/config/template-config.json
+{
+  "defaultTemplate": "default",
+  "repositories": {
+    "payment-api": "my-review"
+  }
+}
+```
+**4. Restart service:**
+
+```bash
+docker-compose restart pr-automation
+```
+
+### Available Variables
+
+Use these in your templates: `{{prUrl}}`, `{{title}}`, `{{author}}`, `{{repository}}`, `{{sourceBranch}}`, `{{destinationBranch}}`, `{{description}}`
+
+### Built-in Example Templates
+
+- **`security-focused`** - Security vulnerability analysis
+- **`performance-review`** - Performance bottleneck detection  
+- **`quick-review`** - Fast review for small changes
+
+### Complete Documentation
+
+📖 **See [TEMPLATE_GUIDE.md](./TEMPLATE_GUIDE.md)**.
 
 ## Development
 
