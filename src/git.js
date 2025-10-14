@@ -24,7 +24,11 @@ function projectExists(projectName) {
  * @param {string} projectName - Name of the project/repository
  * @returns {Promise<Object>} - Result with success status and path
  */
+<<<<<<< HEAD
 async function cloneRepository(cloneUrl, projectName) {
+=======
+async function cloneRepository(projectName, repoUrl) {
+>>>>>>> 36b16bc (fix: rename parameter in cloneRepository function for clarity)
   try {
     logger.info(`Cloning repository: ${projectName}`);
     
