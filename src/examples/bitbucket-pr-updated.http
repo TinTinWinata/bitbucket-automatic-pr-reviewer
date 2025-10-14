@@ -1,0 +1,30 @@
+### Test Bitbucket Pull Request Updated Webhook
+# Simulates a PR update event (e.g. new commits pushed or description changed)
+
+POST http://localhost:3000/webhook/bitbucket/pr
+Content-Type: application/json
+x-event-key: pullrequest:updated
+x-hub-signature: sha256=dummy-signature
+
+{
+  "repository": {
+    "name": "demo-by-rik",
+    "workspace": { "slug": "xriopteam" },
+    "links": {
+      "html": { "href": "https://bitbucket.org/xriopteam/demo-by-rik" },
+      "clone": [
+        { "name": "https", "href": "https://github.com/ritikrikm/my-app.git" }
+      ]
+    }
+  },
+  "pullrequest": {
+    "title": "fix: update webhook payload (updated)",
+    "description": "Simulating PR update event.",
+    "author": { "display_name": "Ritik Mehta" },
+    "source": { "branch": { "name": "feature/add-rest-client" } },
+    "destination": { "branch": { "name": "main" } },
+    "links": {
+      "html": { "href": "https://bitbucket.org/xriopteam/demo-by-rik/pull-requests/1" }
+    }
+  }
+}
