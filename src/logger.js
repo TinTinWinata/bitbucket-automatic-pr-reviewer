@@ -1,5 +1,7 @@
 import winston from "winston";
 import "winston-daily-rotate-file";
+import dotenv from "dotenv";
+dotenv.config();
 
 // Environment variables with defaults
 const LOG_LEVEL = process.env.LOG_LEVEL || "info";
