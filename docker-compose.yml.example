@@ -26,6 +26,7 @@ services:
       - traefik.http.services.pr-automation.loadbalancer.server.port=3000
     environment:
       - PORT=3000
+      - CLAUDE_TIMEOUT_CONFIG=${CLAUDE_TIMEOUT_CONFIG:-10}
       - CLAUDE_MODEL=${CLAUDE_MODEL:-sonnet}
       - BITBUCKET_TOKEN=${BITBUCKET_TOKEN}
       - BITBUCKET_USER=${BITBUCKET_USER}

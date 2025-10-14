@@ -69,7 +69,13 @@ async function processPullRequest(prData) {
       // Get model from env or default to sonnet
       const model = process.env.CLAUDE_MODEL || 'sonnet';
       
-      logger.info(`Starting Claude analysis with ${model} model (timeout: 10 minutes)...`);
+      // Configure timeout from environment (in minutes). Default to 10 if invalid/not set.
+      let timeoutMinutes = parseInt(process.env.CLAUDE_TIMEOUT_CONFIG);
+      if (Number.isNaN(timeoutMinutes) || timeoutMinutes <= 0) {
+        timeoutMinutes = 10;
+      }
+
+      logger.info(`Starting Claude analysis with ${model} model (timeout: ${timeoutMinutes} minutes)...`);
       
       
       // Set environment variables for the child process
@@ -99,12 +105,13 @@ async function processPullRequest(prData) {
         let stderr = '';
         
         // Set timeout
+        const timeoutMs = timeoutMinutes * 60 * 1000;
         const timeout = setTimeout(() => {
           claudeProcess.kill('SIGTERM');
-          reject(new Error('Claude analysis timed out after 10 minutes. The PR might be too large or complex.'));
-        }, 10 * 60 * 1000);
+          reject(new Error(`Claude analysis timed out after ${timeoutMinutes} minutes. The PR might be too large or complex.`));
+        }, timeoutMs);
         
-        claudeProcess.stdout.on('data', (data) => {
+        claudeProcess.stdout.on('data', (data) => { 
           const chunk = data.toString();
           stdout += chunk;
           // Log progress (optional, can be removed if too verbose)
@@ -218,10 +225,14 @@ async function processPullRequest(prData) {
         fs.unlinkSync(promptFile);
       }
       
-      // Check if it's a timeout error
-      if (error.killed || error.signal === 'SIGTERM') {
-        logger.error('❌ Claude CLI timed out after 10 minutes');
-        throw new Error('Claude analysis timed out after 10 minutes. The PR might be too large or complex.');
+      // Checking if it's a timeout error
+      if (error.killed || error.signal === 'SIGTERM' || /timed out after \d+ minutes/.test(error.message)) {
+        let timeoutMinutes = parseInt(process.env.CLAUDE_TIMEOUT_CONFIG, 10);
+        if (Number.isNaN(timeoutMinutes) || timeoutMinutes <= 0) {
+          timeoutMinutes = 10;
+        }
+        logger.error(`❌ Claude CLI timed out after ${timeoutMinutes} minutes`);
+        throw new Error(`Claude analysis timed out after ${timeoutMinutes} minutes. The PR might be too large or complex.`);
       }
       
       throw error;
