@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const logger = require('./logger').default;
 
 /**
  * Template Manager - Handles loading and processing PR review templates
@@ -22,7 +23,7 @@ class TemplateManager {
       }
       return { defaultTemplate: 'default', repositories: {} };
     } catch (error) {
-      console.warn(
+      logger.warn(
         'Failed to load template config, using defaults: ',
         error.message
       );
@@ -53,14 +54,14 @@ class TemplateManager {
     );
 
     if (fs.existsSync(customPath)) {
-      console.log(`Loading custom template: ${templateName}`);
+      logger.info(`Loading custom template: ${templateName}`);
       return fs.readFileSync(customPath, 'utf-8');
     }
 
     // Fall back to default template
     const defaultPath = path.join(this.templatesDir, 'default', 'prompt.md');
     if (fs.existsSync(defaultPath)) {
-      console.log(`Loading default template for: ${templateName}`);
+      logger.info(`Loading default template for: ${templateName}`);
       return fs.readFileSync(defaultPath, 'utf-8');
     }
     throw new Error(`Template not found: ${templateName}`);
@@ -75,7 +76,7 @@ class TemplateManager {
   substituteVariables(template, variables) {
     return template.replace(/{{(\w+)}}/g, (_, key) => {
       if (variables[key] === undefined) {
-        console.warn(`Warning: Variable {{${key}}} not found in template variables`);
+        logger.warn(`Warning: Variable {{${key}}} not found in template variables`);
         return `{{${key}}}`;
       }
       return variables[key];
@@ -132,7 +133,7 @@ class TemplateManager {
     );
 
     if (missingRecommended.length > 0) {
-      console.warn(
+      logger.warn(
         `Note: Template is missing recommended variables: ${missingRecommended.join(
           ', '
         )}`
@@ -162,14 +163,14 @@ class TemplateManager {
     // Validate template before processing
     const validation = this.validateTemplate(template);
     if (!validation.success) {
-      console.error('Template validation failed:', validation.errors);
+      logger.error('Template validation failed:', validation.errors);
       throw new Error(`Invalid template: ${validation.errors.join(', ')}`);
     }
 
     // Log successful validation
-    console.log('Template validation passed');
+    logger.info('Template validation passed');
     if (validation.variables.length > 0) {
-      console.log(`Variables found: ${validation.variables.join(', ')}`);
+      logger.debug(`Variables found: ${validation.variables.join(', ')}`);
     }
 
     const variables = {
