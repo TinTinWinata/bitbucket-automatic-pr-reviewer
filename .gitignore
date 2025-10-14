@@ -12,3 +12,4 @@ projects/
 .claude.json
 
 docker-compose.yaml
+docker-compose.yml
