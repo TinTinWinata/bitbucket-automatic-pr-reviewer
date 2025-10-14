@@ -105,7 +105,7 @@ function validateBitbucketWebhook(req, res, next) {
 
     logger.info('✅ Webhook signature verified');
   } else {
-    logger.warn('⚠️  WARNING: BITBUCKET_WEBHOOK_SECRET not configured - signature validation disabled');
+    logger.warn('BITBUCKET_WEBHOOK_SECRET not configured - signature validation disabled');
   }
 
   // 2. Verify workspace (organization)

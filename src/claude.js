@@ -24,7 +24,7 @@ async function processPullRequest(prData) {
     logger.info(`Repository: ${prData.repository}`);
 
     // STEP 1: Validate and ensure project is cloned
-    logger.info('\n=== Step 1: Validating Project ===');
+    logger.info('=== Step 1: Validating Project ===');
     const repoData = {
       name: prData.repository,
       cloneUrl: prData.repoCloneUrl,
@@ -40,7 +40,6 @@ async function processPullRequest(prData) {
 
     logger.info(`Project path: ${projectResult.path}`);
     logger.info(`Was cloned: ${projectResult.wasCloned ? 'Yes' : 'No (already existed)'}`);
-    logger.info('================================\n');
 
     // STEP 2: Process with Claude CLI
     logger.info('=== Step 2: Processing with Claude CLI ===');

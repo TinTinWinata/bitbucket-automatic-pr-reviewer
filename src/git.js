@@ -98,7 +98,7 @@ async function updateRepository(projectName, branch) {
     };
 
   } catch (error) {
-    logger.error(`Error updating repository ${projectName}:`, error.message);
+    logger.error(`Issue when updating repository ${projectName}:`, error.message);
     throw new Error(`Failed to update repository: ${error.message}`);
   }
 }
