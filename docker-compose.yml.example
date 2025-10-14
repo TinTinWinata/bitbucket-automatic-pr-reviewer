@@ -10,7 +10,7 @@ services:
       - traefik-network
     labels:
       - traefik.enable=true
-      - traefik.http.routers.pr-automation.rule=Host(`bitbucket.tintinwinata.online`)
+      - traefik.http.routers.pr-automation.rule=Host(`YOUR_WEBSITE_URL`)
       - traefik.http.routers.pr-automation.tls=true
       - traefik.http.routers.pr-automation.entrypoints=web,websecure
       - traefik.http.routers.pr-automation.tls.certresolver=mytlschallenge
