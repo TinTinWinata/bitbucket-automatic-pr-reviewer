@@ -39,7 +39,7 @@ async function processQueue() {
   try {
     await processPullRequest(prData);
   } catch (error) {
-    logger.error('Error processing PR with Claude:', error);
+    logger.error(`Error processing PR with Claude: ${error.message}`);
   }
   
   isProcessing = false;
@@ -136,7 +136,7 @@ app.get('/metrics', async (req, res) => {
     const metricsData = await register.metrics();
     res.end(metricsData);
   } catch (error) {
-    logger.error('Error collecting metrics:', error);
+    logger.error(`Error collecting metrics: ${error.message}`);
     res.status(500).end(error.message);
   }
 });
@@ -145,7 +145,7 @@ app.get('/metrics', async (req, res) => {
 app.post('/webhook/bitbucket/pr', validateBitbucketWebhook, async (req, res) => {
   try {
     logger.info('Received Bitbucket PR webhook');
-    logger.info('Event:', req.headers['x-event-key']);
+    logger.info(`Event: ${req.headers['x-event-key']}`);
 
     const eventKey = req.headers['x-event-key'];
     
@@ -174,7 +174,7 @@ app.post('/webhook/bitbucket/pr', validateBitbucketWebhook, async (req, res) => 
                     payload.repository?.links?.html?.href || 'No clone URL',
     };
 
-    logger.debug('PR Data:', prData);
+    logger.debug(`PR Data: ${JSON.stringify(prData)}`);
 
     // Track PR metrics based on event type
     if (eventKey === 'pullrequest:created') {
@@ -198,7 +198,7 @@ app.post('/webhook/bitbucket/pr', validateBitbucketWebhook, async (req, res) => 
     processQueue();
 
   } catch (error) {
-    logger.error('Error handling webhook:', error);
+    logger.error(`Error handling webhook: ${error.message}`);
     res.status(500).json({ 
       error: 'Internal server error',
       message: error.message 

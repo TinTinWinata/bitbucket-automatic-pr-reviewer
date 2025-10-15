@@ -47,7 +47,7 @@ async function cloneRepository(projectName, repoUrl) {
     );
 
     if (stderr && !stderr.includes('Cloning into')) {
-      logger.warn('Git clone warning:', stderr);
+      logger.warn(`Git clone warning: ${stderr}`);
     }
 
     logger.info(`Successfully cloned ${projectName} to ${projectPath}`);
@@ -59,7 +59,7 @@ async function cloneRepository(projectName, repoUrl) {
     };
 
   } catch (error) {
-    logger.error(`Error cloning repository ${projectName}:`, error.message);
+    logger.error(`Error cloning repository ${projectName}: ${error.message}`);
     throw new Error(`Failed to clone repository: ${error.message}`);
   }
 }
@@ -83,7 +83,7 @@ async function updateRepository(projectName, branch) {
     // Fetch latest changes (credentials are handled by Git's credential helper)
     await execAsync(`git -C "${projectPath}" fetch --all`);
 
-    logger.debug('Branch: ', branch)
+    logger.debug(`Branch: ${branch}`)
 
     // Checkout branch if specified
     if (branch) {
@@ -91,9 +91,10 @@ async function updateRepository(projectName, branch) {
       await execAsync(`git -C "${projectPath}" checkout "${branch}"`);
     }
 
-    // Pull latest changes
-    const { stdout } = await execAsync(`git -C "${projectPath}" pull`);
-    logger.debug(`Update output: ${stdout}`);
+    // Reset to match remote branch exactly (avoids divergent branches issues)
+    const branchName = branch || 'main';
+    const { stdout } = await execAsync(`git -C "${projectPath}" reset --hard origin/${branchName}`);
+    logger.debug(`Reset output: ${stdout}`);
 
     return {
       success: true,
@@ -102,7 +103,7 @@ async function updateRepository(projectName, branch) {
     };
 
   } catch (error) {
-    logger.error(`Issue when updating repository ${projectName}:`, error.message);
+    logger.error(`Issue when updating repository ${projectName}: ${error.message}`);
     throw new Error(`Failed to update repository: ${error.message}`);
   }
 }
@@ -131,7 +132,7 @@ async function ensureProjectExists(repoData) {
         message: 'Project exists and updated'
       };
     } catch (error) {
-      logger.warn('Could not update repository, continuing with existing:', error.message);
+      logger.warn(`Could not update repository, continuing with existing: ${error.message}`);
       return {
         success: true,
         path: path.join(PROJECTS_DIR, projectName),
