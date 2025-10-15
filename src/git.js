@@ -19,11 +19,11 @@ function projectExists(projectName) {
 
 /**
  * Clone a Bitbucket repository
- * @param {string} repoUrl - Repository clone URL
+ * @param {string} cloneUrl - Repository clone URL
  * @param {string} projectName - Name of the project/repository
  * @returns {Promise<Object>} - Result with success status and path
  */
-async function cloneRepository(repoUrl, projectName) {
+async function cloneRepository(cloneUrl, projectName) {
   try {
     console.log(`Cloning repository: ${projectName}`);
     
@@ -37,7 +37,7 @@ async function cloneRepository(repoUrl, projectName) {
 
     // Clone the repository (credentials are handled by Git's credential helper)
     const { stdout, stderr } = await execAsync(
-      `git clone "${repoUrl}" "${projectPath}"`,
+      `git clone "${cloneUrl}" "${projectPath}"`,
       { maxBuffer: 1024 * 1024 * 10 } // 10MB buffer
     );
 
