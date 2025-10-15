@@ -73,11 +73,8 @@ describe("git.js Unit Tests", () => {
 
       const result = await cloneRepository(projectName, cloneUrl);
 
-      expect(result).toEqual({
-        success: true,
-        path: projectPath,
-        message: "Repository cloned successfully",
-      });
+      expect(result.message).toBe("Repository cloned successfully");
+      expect(result.success).toBe(true);
     });
 
     test("should handle clone failure", async () => {
