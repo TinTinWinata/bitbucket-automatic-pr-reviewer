@@ -39,6 +39,7 @@ services:
     volumes:
       - ./src:/app/src
       - ./projects:/app/projects
+      - ./logs:/app/logs
       - ./.mcp.json:/app/.mcp.json
       - ./claude-config/.claude.json:/home/node/.claude.json
       - ./claude-config/.claude:/home/node/.claude

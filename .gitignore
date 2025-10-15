@@ -6,6 +6,7 @@ yarn-debug.log*
 yarn-error.log*
 .DS_Store
 *.log
+logs/
 projects/
 
 .claude
@@ -13,3 +14,5 @@ projects/
 
 docker-compose.yaml
 docker-compose.yml
+
+.cursor

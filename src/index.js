@@ -3,6 +3,7 @@ const dotenv = require('dotenv');
 const crypto = require('crypto');
 const { processPullRequest } = require('./claude');
 const { register, metrics } = require('./metrics');
+const logger = require('./logger').default;
 
 dotenv.config();
 
@@ -33,12 +34,12 @@ async function processQueue() {
   isProcessing = true;
   const prData = reviewQueue.shift(); // Get first item from queue
   
-  console.log(`📋 Processing PR from queue: ${prData.title} (${reviewQueue.length} remaining)`);
-  
+  logger.info(`📋 Processing PR from queue: ${prData.title} (${reviewQueue.length} remaining)`);
+
   try {
     await processPullRequest(prData);
   } catch (error) {
-    console.error('Error processing PR with Claude:', error);
+    logger.error('Error processing PR with Claude:', error);
   }
   
   isProcessing = false;
@@ -87,7 +88,7 @@ function validateBitbucketWebhook(req, res, next) {
     const signature = req.headers['x-hub-signature'];
     
     if (!signature) {
-      console.warn('⚠️  Webhook rejected: Missing X-Hub-Signature header');
+      logger.warn('⚠️  Webhook rejected: Missing X-Hub-Signature header');
       return res.status(401).json({ 
         error: 'Unauthorized',
         message: 'Missing webhook signature' 
@@ -95,16 +96,16 @@ function validateBitbucketWebhook(req, res, next) {
     }
 
     if (!verifyBitbucketSignature(signature, req.rawBody, BITBUCKET_WEBHOOK_SECRET)) {
-      console.warn('⚠️  Webhook rejected: Invalid signature');
+      logger.warn('⚠️  Webhook rejected: Invalid signature');
       return res.status(401).json({ 
         error: 'Unauthorized',
         message: 'Invalid webhook signature' 
       });
     }
 
-    console.log('✅ Webhook signature verified');
+    logger.info('✅ Webhook signature verified');
   } else {
-    console.warn('⚠️  WARNING: BITBUCKET_WEBHOOK_SECRET not configured - signature validation disabled');
+    logger.warn('BITBUCKET_WEBHOOK_SECRET not configured - signature validation disabled');
   }
 
   // 2. Verify workspace (organization)
@@ -112,14 +113,14 @@ function validateBitbucketWebhook(req, res, next) {
                     req.body.repository?.owner?.username;
   
   if (workspace && workspace !== ALLOWED_WORKSPACE) {
-    console.warn(`⚠️  Webhook rejected: Unauthorized workspace "${workspace}" (expected "${ALLOWED_WORKSPACE}")`);
+    logger.warn(`⚠️  Webhook rejected: Unauthorized workspace "${workspace}" (expected "${ALLOWED_WORKSPACE}")`);
     return res.status(403).json({ 
       error: 'Forbidden',
       message: `Webhooks only accepted from ${ALLOWED_WORKSPACE} workspace` 
     });
   }
 
-  console.log(`✅ Workspace verified: ${workspace || 'unknown'}`);
+  logger.info(`✅ Workspace verified: ${workspace || 'unknown'}`);
   next();
 }
 
@@ -135,7 +136,7 @@ app.get('/metrics', async (req, res) => {
     const metricsData = await register.metrics();
     res.end(metricsData);
   } catch (error) {
-    console.error('Error collecting metrics:', error);
+    logger.error('Error collecting metrics:', error);
     res.status(500).end(error.message);
   }
 });
@@ -143,14 +144,14 @@ app.get('/metrics', async (req, res) => {
 // Bitbucket webhook endpoint for PR creation (with security validation)
 app.post('/webhook/bitbucket/pr', validateBitbucketWebhook, async (req, res) => {
   try {
-    console.log('Received Bitbucket PR webhook');
-    console.log('Event:', req.headers['x-event-key']);
+    logger.info('Received Bitbucket PR webhook');
+    logger.info('Event:', req.headers['x-event-key']);
 
     const eventKey = req.headers['x-event-key'];
     
     // Check if event should be processed based on configuration
     if (PROCESS_ONLY_CREATED && eventKey !== 'pullrequest:created') {
-      console.log(`⏭️  Event ignored (only processing PR creation): ${eventKey}`);
+      logger.info(`⏭️  Event ignored (only processing PR creation): ${eventKey}`);
       return res.status(200).json({ 
         message: 'Event ignored (only processing PR creation)',
         event: eventKey 
@@ -173,15 +174,15 @@ app.post('/webhook/bitbucket/pr', validateBitbucketWebhook, async (req, res) => 
                     payload.repository?.links?.html?.href || 'No clone URL',
     };
 
-    console.log('PR Data:', prData);
+    logger.debug('PR Data:', prData);
 
     // Track PR metrics based on event type
     if (eventKey === 'pullrequest:created') {
       metrics.prCreatedCounter.inc({ repository });
-      console.log(`Metrics: Incremented PR created counter for ${repository}`);
+      logger.debug(`Metrics: Incremented PR created counter for ${repository}`);
     } else if (eventKey === 'pullrequest:updated') {
       metrics.prUpdatedCounter.inc({ repository });
-      console.log(`Metrics: Incremented PR updated counter for ${repository}`);
+      logger.debug(`Metrics: Incremented PR updated counter for ${repository}`);
     }
 
     // Acknowledge receipt immediately
@@ -193,11 +194,11 @@ app.post('/webhook/bitbucket/pr', validateBitbucketWebhook, async (req, res) => 
 
     // Add to queue and process sequentially (prevents branch conflicts)
     reviewQueue.push(prData);
-    console.log(`✅ PR added to queue: ${prData.title} (queue size: ${reviewQueue.length})`);
+    logger.info(`✅ PR added to queue: ${prData.title} (queue size: ${reviewQueue.length})`);
     processQueue();
 
   } catch (error) {
-    console.error('Error handling webhook:', error);
+    logger.error('Error handling webhook:', error);
     res.status(500).json({ 
       error: 'Internal server error',
       message: error.message 
@@ -207,8 +208,8 @@ app.post('/webhook/bitbucket/pr', validateBitbucketWebhook, async (req, res) => 
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`PR Automation server listening on port ${PORT}`);
-  console.log(`Webhook endpoint: http://localhost:${PORT}/webhook/bitbucket/pr`);
-  console.log(`Event filtering: ${PROCESS_ONLY_CREATED ? 'Only PR creation events' : 'All PR events (created + updated)'}`);
+  logger.info(`PR Automation server listening on port ${PORT}`);
+  logger.info(`Webhook endpoint: http://localhost:${PORT}/webhook/bitbucket/pr`);
+  logger.info(`Event filtering: ${PROCESS_ONLY_CREATED ? 'Only PR creation events' : 'All PR events (created + updated)'}`);
 });
 

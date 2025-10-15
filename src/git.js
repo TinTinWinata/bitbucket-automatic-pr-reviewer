@@ -2,6 +2,7 @@ const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const { promisify } = require('util');
+const logger = require('./logger').default;
 
 const execAsync = promisify(exec);
 
@@ -25,12 +26,12 @@ function projectExists(projectName) {
  */
 async function cloneRepository(cloneUrl, projectName) {
   try {
-    console.log(`Cloning repository: ${projectName}`);
+    logger.info(`Cloning repository: ${projectName}`);
     
     // Ensure projects directory exists
     if (!fs.existsSync(PROJECTS_DIR)) {
       fs.mkdirSync(PROJECTS_DIR, { recursive: true });
-      console.log(`Created projects directory: ${PROJECTS_DIR}`);
+      logger.info(`Created projects directory: ${PROJECTS_DIR}`);
     }
 
     const projectPath = path.join(PROJECTS_DIR, projectName);
@@ -42,10 +43,10 @@ async function cloneRepository(cloneUrl, projectName) {
     );
 
     if (stderr && !stderr.includes('Cloning into')) {
-      console.warn('Git clone warning:', stderr);
+      logger.warn('Git clone warning:', stderr);
     }
 
-    console.log(`Successfully cloned ${projectName} to ${projectPath}`);
+    logger.info(`Successfully cloned ${projectName} to ${projectPath}`);
     
     return {
       success: true,
@@ -54,7 +55,7 @@ async function cloneRepository(cloneUrl, projectName) {
     };
 
   } catch (error) {
-    console.error(`Error cloning repository ${projectName}:`, error.message);
+    logger.error(`Error cloning repository ${projectName}:`, error.message);
     throw new Error(`Failed to clone repository: ${error.message}`);
   }
 }
@@ -73,22 +74,22 @@ async function updateRepository(projectName, branch) {
       throw new Error(`Project ${projectName} does not exist at ${projectPath}`);
     }
 
-    console.log(`Updating repository: ${projectName}`);
+    logger.info(`Updating repository: ${projectName}`);
 
     // Fetch latest changes (credentials are handled by Git's credential helper)
     await execAsync(`git -C "${projectPath}" fetch --all`);
 
-    console.log('Branch: ', branch)
+    logger.debug('Branch: ', branch)
 
     // Checkout branch if specified
     if (branch) {
-      console.log(`Checking out branch: ${branch}`);
+      logger.info(`Checking out branch: ${branch}`);
       await execAsync(`git -C "${projectPath}" checkout "${branch}"`);
     }
 
     // Pull latest changes
     const { stdout } = await execAsync(`git -C "${projectPath}" pull`);
-    console.log(`Update output: ${stdout}`);
+    logger.debug(`Update output: ${stdout}`);
 
     return {
       success: true,
@@ -97,7 +98,7 @@ async function updateRepository(projectName, branch) {
     };
 
   } catch (error) {
-    console.error(`Error updating repository ${projectName}:`, error.message);
+    logger.error(`Issue when updating repository ${projectName}:`, error.message);
     throw new Error(`Failed to update repository: ${error.message}`);
   }
 }
@@ -111,10 +112,10 @@ async function ensureProjectExists(repoData) {
   const projectName = repoData.name;
   const cloneUrl = repoData.cloneUrl;
 
-  console.log(`Checking if project ${projectName} exists...`);
+  logger.info(`Checking if project ${projectName} exists...`);
 
   if (projectExists(projectName)) {
-    console.log(`Project ${projectName} already exists`);
+    logger.info(`Project ${projectName} already exists`);
     
     // Optionally update the repository
     try {
@@ -126,7 +127,7 @@ async function ensureProjectExists(repoData) {
         message: 'Project exists and updated'
       };
     } catch (error) {
-      console.warn('Could not update repository, continuing with existing:', error.message);
+      logger.warn('Could not update repository, continuing with existing:', error.message);
       return {
         success: true,
         path: path.join(PROJECTS_DIR, projectName),
@@ -135,7 +136,7 @@ async function ensureProjectExists(repoData) {
       };
     }
   } else {
-    console.log(`Project ${projectName} does not exist, cloning...`);
+    logger.info(`Project ${projectName} does not exist, cloning...`);
     const result = await cloneRepository(cloneUrl, projectName);
     return {
       ...result,

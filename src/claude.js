@@ -5,6 +5,7 @@ const path = require('path');
 const { ensureProjectExists } = require('./git');
 const { metrics } = require('./metrics');
 const TemplateManager = require('./templateManager');
+const logger = require('./logger').default;
 
 const execAsync = promisify(exec);
 
@@ -17,13 +18,13 @@ async function processPullRequest(prData) {
   const startTime = Date.now();
   
   try {
-    console.log('Processing PR with Claude...');
-    console.log(`PR Title: ${prData.title}`);
-    console.log(`Author: ${prData.author}`);
-    console.log(`Repository: ${prData.repository}`);
+    logger.info('Processing PR with Claude...');
+    logger.info(`PR Title: ${prData.title}`);
+    logger.info(`Author: ${prData.author}`);
+    logger.info(`Repository: ${prData.repository}`);
 
     // STEP 1: Validate and ensure project is cloned
-    console.log('\n=== Step 1: Validating Project ===');
+    logger.info('=== Step 1: Validating Project ===');
     const repoData = {
       name: prData.repository,
       cloneUrl: prData.repoCloneUrl,
@@ -31,18 +32,17 @@ async function processPullRequest(prData) {
     };
 
     const projectResult = await ensureProjectExists(repoData);
-    console.log(`Project validation result:`, projectResult);
+    logger.debug(`Project validation result:`, projectResult);
     
     if (!projectResult.success) {
       throw new Error('Failed to ensure project exists');
     }
 
-    console.log(`Project path: ${projectResult.path}`);
-    console.log(`Was cloned: ${projectResult.wasCloned ? 'Yes' : 'No (already existed)'}`);
-    console.log('================================\n');
+    logger.info(`Project path: ${projectResult.path}`);
+    logger.info(`Was cloned: ${projectResult.wasCloned ? 'Yes' : 'No (already existed)'}`);
 
     // STEP 2: Process with Claude CLI
-    console.log('=== Step 2: Processing with Claude CLI ===');
+    logger.info('=== Step 2: Processing with Claude CLI ===');
 
     const templateManager = new TemplateManager();
     const prompt = templateManager.getPromptForPR(prData);
@@ -52,7 +52,7 @@ async function processPullRequest(prData) {
     fs.writeFileSync(promptFile, prompt);
 
     try {
-      console.log('Executing Claude CLI...');
+      logger.info('Executing Claude CLI...');
       const startTime = Date.now();
       
       // Copy .mcp.json to project directory so Claude CLI can use MCP servers
@@ -61,15 +61,15 @@ async function processPullRequest(prData) {
       
       if (fs.existsSync(mcpSourcePath)) {
         fs.copyFileSync(mcpSourcePath, mcpDestPath);
-        console.log(`✓ Copied .mcp.json to ${mcpDestPath}`);
+        logger.info(`✓ Copied .mcp.json to ${mcpDestPath}`);
       } else {
-        console.warn('⚠ Warning: .mcp.json not found at /app/.mcp.json - Bitbucket MCP will not be available');
+        logger.warn('⚠ Warning: .mcp.json not found at /app/.mcp.json - Bitbucket MCP will not be available');
       }
       
       // Get model from env or default to sonnet
       const model = process.env.CLAUDE_MODEL || 'sonnet';
       
-      console.log(`Starting Claude analysis with ${model} model (timeout: 10 minutes)...`);
+      logger.info(`Starting Claude analysis with ${model} model (timeout: 10 minutes)...`);
       
       
       // Set environment variables for the child process
@@ -123,9 +123,9 @@ async function processPullRequest(prData) {
             resolve({ stdout, stderr });
           } else {
             // Log both stdout and stderr to help debug
-            console.error('Claude CLI failed with code:', code);
-            if (stderr) console.error('STDERR:', stderr);
-            if (stdout) console.error('STDOUT:', stdout);
+            logger.error('Claude CLI failed with code:', code);
+            if (stderr) logger.error('STDERR:', stderr);
+            if (stdout) logger.error('STDOUT:', stdout);
             reject(new Error(`Claude CLI exited with code ${code}: ${stderr || stdout || 'No error output'}`));
           }
         });
@@ -144,10 +144,10 @@ async function processPullRequest(prData) {
       const { stdout, stderr } = result;
 
       const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-      console.log(`✓ Claude analysis completed in ${duration}s`);
+      logger.info(`✓ Claude analysis completed in ${duration}s`);
 
       if (stderr) {
-        console.warn('Claude CLI warnings:', stderr);
+        logger.warn('Claude CLI warnings:', stderr);
       }
 
       fs.unlinkSync(promptFile);
@@ -155,6 +155,8 @@ async function processPullRequest(prData) {
       // Extract metrics from JSON output
       let isLgtm = false;
       let issueCount = 0;
+      let isReviewFailed = false;
+      let failedReviewReason = null;
       
       // Look for JSON block in the response (should be at the end)
       const jsonMatch = stdout.match(/```json\s*\n\s*({[\s\S]*?})\s*\n\s*```/);
@@ -164,32 +166,44 @@ async function processPullRequest(prData) {
           const reviewMetrics = JSON.parse(jsonMatch[1]);
           isLgtm = reviewMetrics.isLgtm === true;
           issueCount = typeof reviewMetrics.issueCount === 'number' ? reviewMetrics.issueCount : 0;
-          console.log(`✓ Parsed metrics from JSON: isLgtm=${isLgtm}, issueCount=${issueCount}`);
+          isReviewFailed = reviewMetrics.isReviewFailed === true;
+          failedReviewReason = reviewMetrics.failedReviewReason || null;
+          logger.info(`✓ Parsed metrics from JSON: isLgtm=${isLgtm}, issueCount=${issueCount}, isReviewFailed=${isReviewFailed}, failedReviewReason=${failedReviewReason}`);
         } catch (parseError) {
-          console.error('Error parsing metrics JSON:', parseError.message);
+          logger.error('Error parsing metrics JSON:', parseError.message);
           throw new Error(`Failed to parse metrics JSON: ${parseError.message}`);
         }
       } else {
-        console.error('❌ No JSON metrics found in Claude response');
+        logger.error('❌ No JSON metrics found in Claude response');
         // Default to conservative metrics
         isLgtm = false;
         issueCount = 0;
+        isReviewFailed = false;
+        failedReviewReason = null;
       }
       
-      // Track successful review
-      metrics.claudeReviewSuccessCounter.inc({ repository });
-      metrics.claudeReviewDurationHistogram.observe({ repository, status: 'success' }, parseFloat(duration));
-      console.log(`Metrics: Incremented successful review counter for ${repository}`);
+      // Track review failure if indicated by Claude
+      if (isReviewFailed) {
+        const errorType = failedReviewReason ? 'claude_reported' : 'unknown';
+        metrics.claudeReviewFailureCounter.inc({ repository, error_type: errorType });
+        logger.error(`Claude reported review failure: ${failedReviewReason || 'No reason provided'}`);
+        logger.debug(`Metrics: Incremented failed review counter for ${repository} (error: ${errorType})`);
+      } else {
+        // Track successful review
+        metrics.claudeReviewSuccessCounter.inc({ repository });
+        metrics.claudeReviewDurationHistogram.observe({ repository, status: 'success' }, parseFloat(duration));
+        logger.debug(`Metrics: Incremented successful review counter for ${repository}`);
+      }
       
       // Track LGTM or Issues
       if (isLgtm) {
         metrics.claudeLgtmCounter.inc({ repository });
-        console.log(`Metrics: Incremented LGTM counter for ${repository}`);
+        logger.debug(`Metrics: Incremented LGTM counter for ${repository}`);
       }
       
       if (issueCount > 0) {
         metrics.claudeIssuesCounter.inc({ repository }, issueCount);
-        console.log(`Metrics: Incremented issues found counter by ${issueCount} for ${repository}`);
+        logger.debug(`Metrics: Incremented issues found counter by ${issueCount} for ${repository}`);
       }
 
       return {
@@ -206,7 +220,7 @@ async function processPullRequest(prData) {
       
       // Check if it's a timeout error
       if (error.killed || error.signal === 'SIGTERM') {
-        console.error('❌ Claude CLI timed out after 10 minutes');
+        logger.error('❌ Claude CLI timed out after 10 minutes');
         throw new Error('Claude analysis timed out after 10 minutes. The PR might be too large or complex.');
       }
       
@@ -214,7 +228,7 @@ async function processPullRequest(prData) {
     }
 
   } catch (error) {
-    console.error('Error executing Claude CLI:', error);
+    logger.error('Error executing Claude CLI:', error);
     
     // Track failed review
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
@@ -224,7 +238,7 @@ async function processPullRequest(prData) {
     
     metrics.claudeReviewFailureCounter.inc({ repository, error_type: errorType });
     metrics.claudeReviewDurationHistogram.observe({ repository, status: 'failure' }, parseFloat(duration));
-    console.log(`Metrics: Incremented failed review counter for ${repository} (error: ${errorType})`);
+    logger.debug(`Metrics: Incremented failed review counter for ${repository} (error: ${errorType})`);
     
     throw error;
   }

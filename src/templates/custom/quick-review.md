@@ -43,6 +43,14 @@ Skip detailed analysis of:
 ```json
 {
   "isLgtm": true/false,
-  "issueCount": <number>
+  "issueCount": <number>,
+  "isReviewFailed": true/false,
+  "failedReviewReason": "<error description or null>"
 }
 ```
+
+Where:
+- `isLgtm`: true if no issues found, false if issues were identified
+- `issueCount`: exact number of issues found (0 if LGTM)
+- `isReviewFailed`: true if the review process failed (e.g., Bitbucket MCP connection failed, network issues, failed to send the review to bitbucket, etc.), false if review completed successfully
+- `failedReviewReason`: description of why the review failed (null if isReviewFailed is false)
