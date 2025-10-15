@@ -150,15 +150,23 @@ This implementation uses **Claude CLI** instead of the Anthropic API:
 ```
 @pr-automation/
 ├── src/
-│   ├── index.js      # Express server and webhook handler
-│   ├── claude.js     # Claude CLI integration with validation
-│   └── git.js        # Git operations (clone, update, validate)
-├── projects/         # Cloned repositories (volume mounted)
-├── Dockerfile        # Docker image with Claude CLI installed
-├── docker-compose.yml # Docker Compose setup
-├── package.json      # Node.js dependencies
-├── .env.example      # Environment variables template
-└── README.md         # This file
+│   ├── index.js          # Express server and webhook handler
+│   ├── claude.js         # Claude CLI integration with validation
+│   ├── git.js            # Git operations (clone, update, validate)
+│   ├── metrics.js        # Prometheus metrics collection
+│   ├── logger.js         # Logging configuration
+│   └── templateManager.js # Template management for PR reviews
+├── tests/                # Unit tests directory
+│   ├── claude.test.js    # Tests for Claude.js functionality
+│   ├── git.test.js       # Tests for Git operations
+│   └── metrics.test.js   # Tests for metrics collection
+├── projects/             # Cloned repositories (volume mounted)
+├── Dockerfile            # Docker image with Claude CLI installed
+├── docker-compose.yml    # Docker Compose setup
+├── jest.config.json      # Jest testing configuration
+├── package.json          # Node.js dependencies and scripts
+├── .env.example          # Environment variables template
+└── README.md             # This file
 ```
 
 ## API Endpoints
@@ -252,6 +260,26 @@ Use these in your templates: `{{prUrl}}`, `{{title}}`, `{{author}}`, `{{reposito
 
 📖 **See [TEMPLATE_GUIDE.md](./TEMPLATE_GUIDE.md)**.
 
+## Testing
+
+This project includes comprehensive unit tests to ensure code quality and reliability.
+
+### Running Tests
+
+```bash
+# Install dependencies
+npm install
+
+# Run all tests
+npm test
+
+# Run tests in watch mode (auto-reruns on file changes)
+npm run test:watch
+
+# Run tests with coverage report
+npm run test:coverage
+```
+****
 ## Development
 
 ### Running without Docker
@@ -262,6 +290,9 @@ npm install -g @anthropic-ai/claude-code
 
 # Install dependencies
 npm install
+
+# Run tests to verify setup
+npm test
 
 # Create projects directory
 mkdir projects
