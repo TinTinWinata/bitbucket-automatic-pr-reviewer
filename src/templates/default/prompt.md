@@ -82,6 +82,10 @@ No need to show any others things other then the given template (e.g. `Key impro
 
 ---
 
+## Check
+
+Before posting your review, please verify whether your comment has already been sent to the related PR. This ensures that your review is visible to users. If your comment is not yet present, please re-attempt to post it again.
+
 ## Final Step: Output Metrics
 
 After posting the PR comment, you MUST output a JSON block for metrics tracking in this exact format:
