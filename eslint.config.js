@@ -39,25 +39,6 @@ module.exports = [
     },
   },
   {
-    files: ['src/logger.js'],
-    languageOptions: {
-      ecmaVersion: 2021,
-      sourceType: 'module',
-      globals: {
-        console: 'readonly',
-        process: 'readonly',
-      },
-    },
-    plugins: {
-      prettier,
-    },
-    rules: {
-      'prettier/prettier': 'error',
-      'no-unused-vars': 'warn',
-      'no-console': 'off',
-    },
-  },
-  {
     files: ['**/*.test.js', '**/*.spec.js'],
     languageOptions: {
       globals: {
