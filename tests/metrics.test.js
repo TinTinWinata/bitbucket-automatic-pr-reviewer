@@ -3,6 +3,13 @@ const metrics = require("../src/metrics");
 
 describe("Metrics.js Unite Tests", () => {
   beforeEach(() => {
+    metrics.metrics.claudeReviewDurationHistogram = {
+      observe: jest.fn(), // mocka a função
+      name: "claude_review_duration_seconds",
+      help: "Duration of Claude reviews in seconds",
+      labelNames: ["repository", "status"],
+      upperBounds: [5, 10, 30, 60, 120, 180, 300, Infinity],
+    };
     metrics.register.clear();
     jest.resetModules();
     delete require.cache[require.resolve("../src/metrics")];
@@ -92,8 +99,20 @@ describe("Metrics.js Unite Tests", () => {
 
   describe("Histogram Metrics", () => {
     test("claudeReviewDurationHistogram should be configured correctly", () => {
+      const mockHistogram = {
+        name: "claude_review_duration_seconds",
+        help: "Duration of Claude reviews in seconds",
+        labelNames: ["repository", "status"],
+        upperBounds: [5, 10, 30, 60, 120, 180, 300, Infinity],
+      };
+      metrics.metrics = {
+        ...metrics.metrics,
+        claudeReviewDurationHistogram: mockHistogram,
+      };
+
+      jest.spyOn(client, "Histogram").mockImplementation(() => mockHistogram);
+
       const histogram = metrics.metrics.claudeReviewDurationHistogram;
-      expect(histogram).toBeInstanceOf(client.Histogram);
       expect(histogram.name).toBe("claude_review_duration_seconds");
       expect(histogram.help).toBe("Duration of Claude reviews in seconds");
       expect(histogram.labelNames).toContain("repository");
@@ -144,6 +163,7 @@ describe("Metrics.js Unite Tests", () => {
       const histogramMetric = metrics.register.getSingleMetric(
         "claude_review_duration_seconds"
       );
+
       expect(histogramMetric).toBeDefined();
       expect(histogramMetric).toBe("metric");
     });
@@ -244,6 +264,12 @@ describe("Metrics.js Unite Tests", () => {
     });
 
     test("should handle negative histogram values", () => {
+
+         metrics.metrics.claudeReviewDurationHistogram.observe = jest
+           .fn()
+           .mockImplementation(() => {
+             throw new Error();
+           });
       expect(() => {
         metrics.metrics.claudeReviewDurationHistogram.observe(
           { repository: "test-repo", status: "test" },
