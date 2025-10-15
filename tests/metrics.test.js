@@ -1,10 +1,10 @@
 const client = require("prom-client");
 const metrics = require("../src/metrics");
 
-describe("Metrics.js Unite Tests", () => {
+describe("Metrics.js Unit Tests", () => {
   beforeEach(() => {
     metrics.metrics.claudeReviewDurationHistogram = {
-      observe: jest.fn(), // mocka a função
+      observe: jest.fn(),
       name: "claude_review_duration_seconds",
       help: "Duration of Claude reviews in seconds",
       labelNames: ["repository", "status"],
@@ -264,12 +264,11 @@ describe("Metrics.js Unite Tests", () => {
     });
 
     test("should handle negative histogram values", () => {
-
-         metrics.metrics.claudeReviewDurationHistogram.observe = jest
-           .fn()
-           .mockImplementation(() => {
-             throw new Error();
-           });
+      metrics.metrics.claudeReviewDurationHistogram.observe = jest
+        .fn()
+        .mockImplementation(() => {
+          throw new Error();
+        });
       expect(() => {
         metrics.metrics.claudeReviewDurationHistogram.observe(
           { repository: "test-repo", status: "test" },
