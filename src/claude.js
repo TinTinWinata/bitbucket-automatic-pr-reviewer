@@ -32,7 +32,7 @@ async function processPullRequest(prData) {
     };
 
     const projectResult = await ensureProjectExists(repoData);
-    logger.debug(`Project validation result:`, projectResult);
+    logger.debug(`Project validation result: ${JSON.stringify(projectResult)}`);
     
     if (!projectResult.success) {
       throw new Error('Failed to ensure project exists');
@@ -130,9 +130,9 @@ async function processPullRequest(prData) {
             resolve({ stdout, stderr });
           } else {
             // Log both stdout and stderr to help debug
-            logger.error('Claude CLI failed with code:', code);
-            if (stderr) logger.error('STDERR:', stderr);
-            if (stdout) logger.error('STDOUT:', stdout);
+            logger.error(`Claude CLI failed with code: ${code}`);
+            if (stderr) logger.error(`STDERR: ${stderr}`);
+            if (stdout) logger.error(`STDOUT: ${stdout}`);
             reject(new Error(`Claude CLI exited with code ${code}: ${stderr || stdout || 'No error output'}`));
           }
         });
@@ -154,7 +154,7 @@ async function processPullRequest(prData) {
       logger.info(`✓ Claude analysis completed in ${duration}s`);
 
       if (stderr) {
-        logger.warn('Claude CLI warnings:', stderr);
+        logger.warn(`Claude CLI warnings: ${stderr}`);
       }
 
       fs.unlinkSync(promptFile);
@@ -177,7 +177,7 @@ async function processPullRequest(prData) {
           failedReviewReason = reviewMetrics.failedReviewReason || null;
           logger.info(`✓ Parsed metrics from JSON: isLgtm=${isLgtm}, issueCount=${issueCount}, isReviewFailed=${isReviewFailed}, failedReviewReason=${failedReviewReason}`);
         } catch (parseError) {
-          logger.error('Error parsing metrics JSON:', parseError.message);
+          logger.error(`Error parsing metrics JSON: ${parseError.message}`);
           throw new Error(`Failed to parse metrics JSON: ${parseError.message}`);
         }
       } else {
@@ -239,7 +239,7 @@ async function processPullRequest(prData) {
     }
 
   } catch (error) {
-    logger.error('Error executing Claude CLI:', error);
+    logger.error(`Error executing Claude CLI: ${error.message}`);
     
     // Track failed review
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);

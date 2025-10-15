@@ -163,7 +163,7 @@ class TemplateManager {
     // Validate template before processing
     const validation = this.validateTemplate(template);
     if (!validation.success) {
-      logger.error('Template validation failed:', validation.errors);
+      logger.error(`Template validation failed: ${JSON.stringify(validation.errors)}`);
       throw new Error(`Invalid template: ${validation.errors.join(', ')}`);
     }
 
