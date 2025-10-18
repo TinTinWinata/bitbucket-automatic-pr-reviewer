@@ -24,90 +24,25 @@ A simple Docker-based automation service that receives Bitbucket pull request we
 
 ## Quick Start
 
-### 1. Clone and Setup
+**📖 For complete setup instructions, see [SETUP_GUIDE.md](./SETUP_GUIDE.md)**
+
+### Quick Start Commands
 
 ```bash
-cd @pr-automation
-```
+# Interactive setup (recommended)
+npm run setup
 
-### 2. Configure Environment
-
-Create a `.env` file from the example:
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` and add your credentials:
-
-```env
-# Claude Model (haiku, sonnet, or opus)
-CLAUDE_MODEL=sonnet
-
-# Security: Webhook Validation (REQUIRED)
-BITBUCKET_WEBHOOK_SECRET=your-webhook-secret-here
-ALLOWED_WORKSPACE=xriopteam
-
-# Required: Bitbucket Authentication (choose one method)
-# Option 1: Use App Password or Token (recommended)
-BITBUCKET_TOKEN=your-bitbucket-app-password
-
-# Option 2: Use Username and Password (alternative)
-# BITBUCKET_USER=your-username
-# BITBUCKET_PASSWORD=your-password
-
-# Event Filtering (Optional)
-# Set to 'true' to only process PR creation events (ignore updates)
-# Set to 'false' to process all PR events (created + updated)
-PROCESS_ONLY_CREATED=false
-
-# Optional
-PORT=3000
-```
-
-### 3. Configure Claude Authentication
-
-To enable Claude CLI authentication and authorization, you need to copy your Claude configuration files to the `./claude-config` directory:
-
-```bash
-# Create the claude-config directory
-mkdir -p ./claude-config
-
-# Copy your Claude configuration files
-cp ~/.claude.json ./claude-config/
-cp -r ~/.claude ./claude-config/
-```
-
-**Purpose**: These files contain your Claude CLI authentication/authorization data, allowing the Docker container to access Claude without requiring interactive login.
-
-**Note**: The Docker Compose configuration mounts these files into the container:
-- `./claude-config/.claude.json` → `/home/node/.claude.json`
-- `./claude-config/.claude` → `/home/node/.claude`
-
-### 4. Create Bitbucket App Password
-
-1. Go to Bitbucket → Personal Settings → App passwords
-2. Click "Create app password"
-3. Name: `PR Automation`
-4. Permissions: Select `Repositories: Read` and `Pull requests: Read`
-5. Copy the generated password and use it as `BITBUCKET_TOKEN`
-
-### 5. Build and Run with Docker
-
-```bash
-# Build the Docker image (includes Claude CLI installation)
-docker-compose build
-
-# Start the service
+# Or start manually after configuration
 docker-compose up -d
-
-# View logs
-docker-compose logs -f
 ```
 
-The service will be available at `http://localhost:3000`
+### What You Need
 
-### 6. Configure Bitbucket Webhook
+- ✅ Docker and Docker Compose installed
+- ✅ Bitbucket repository with webhook access
+- ✅ Claude CLI installed globally: `npm install -g @anthropic-ai/claude-code`
+
+### Configure Bitbucket Webhook
 
 1. Go to your Bitbucket repository settings
 2. Navigate to **Webhooks** section
