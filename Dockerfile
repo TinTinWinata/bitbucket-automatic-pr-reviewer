@@ -16,8 +16,8 @@ RUN mkdir -p /app/projects
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install --production
+# Install dependencies (skip prepare script to avoid husky issues)
+RUN npm install --production --ignore-scripts
 
 # Copy application source
 COPY src ./src

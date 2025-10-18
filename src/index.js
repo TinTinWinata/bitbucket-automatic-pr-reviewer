@@ -208,7 +208,7 @@ app.post('/webhook/bitbucket/pr', validateBitbucketWebhook, async (req, res) => 
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   logger.info(`PR Automation server listening on port ${PORT}`);
   logger.info(`Webhook endpoint: http://localhost:${PORT}/webhook/bitbucket/pr`);
   logger.info(

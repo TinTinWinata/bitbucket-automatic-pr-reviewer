@@ -51,19 +51,6 @@ async function processPullRequest(prData) {
       logger.info('Executing Claude CLI...');
       const startTime = Date.now();
 
-      // Copy .mcp.json to project directory so Claude CLI can use MCP servers
-      const mcpSourcePath = path.join('/app', '.mcp.json');
-      const mcpDestPath = path.join(projectResult.path, '.mcp.json');
-
-      if (fs.existsSync(mcpSourcePath)) {
-        fs.copyFileSync(mcpSourcePath, mcpDestPath);
-        logger.info(`✓ Copied .mcp.json to ${mcpDestPath}`);
-      } else {
-        logger.warn(
-          '⚠ Warning: .mcp.json not found at /app/.mcp.json - Bitbucket MCP will not be available',
-        );
-      }
-
       // Get model from env or default to sonnet
       const model = process.env.CLAUDE_MODEL || 'sonnet';
 
