@@ -18,3 +18,4 @@ docker-compose.yml
 .cursor
 
 coverage/
+*.backup
