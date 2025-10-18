@@ -27,7 +27,7 @@ function projectExists(projectName) {
 async function cloneRepository(cloneUrl, projectName) {
   try {
     logger.info(`Cloning repository: ${projectName}`);
-    
+
     // Ensure projects directory exists
     if (!fs.existsSync(PROJECTS_DIR)) {
       fs.mkdirSync(PROJECTS_DIR, { recursive: true });
@@ -37,9 +37,9 @@ async function cloneRepository(cloneUrl, projectName) {
     const projectPath = path.join(PROJECTS_DIR, projectName);
 
     // Clone the repository (credentials are handled by Git's credential helper)
-    const { stdout, stderr } = await execAsync(
+    const { stderr } = await execAsync(
       `git clone "${cloneUrl}" "${projectPath}"`,
-      { maxBuffer: 1024 * 1024 * 10 } // 10MB buffer
+      { maxBuffer: 1024 * 1024 * 10 }, // 10MB buffer
     );
 
     if (stderr && !stderr.includes('Cloning into')) {
@@ -47,13 +47,12 @@ async function cloneRepository(cloneUrl, projectName) {
     }
 
     logger.info(`Successfully cloned ${projectName} to ${projectPath}`);
-    
+
     return {
       success: true,
       path: projectPath,
-      message: 'Repository cloned successfully'
+      message: 'Repository cloned successfully',
     };
-
   } catch (error) {
     logger.error(`Error cloning repository ${projectName}: ${error.message}`);
     throw new Error(`Failed to clone repository: ${error.message}`);
@@ -79,7 +78,7 @@ async function updateRepository(projectName, branch) {
     // Fetch latest changes (credentials are handled by Git's credential helper)
     await execAsync(`git -C "${projectPath}" fetch --all`);
 
-    logger.debug(`Branch: ${branch}`)
+    logger.debug(`Branch: ${branch}`);
 
     // Checkout branch if specified
     if (branch) {
@@ -95,9 +94,8 @@ async function updateRepository(projectName, branch) {
     return {
       success: true,
       path: projectPath,
-      message: 'Repository updated successfully'
+      message: 'Repository updated successfully',
     };
-
   } catch (error) {
     logger.error(`Issue when updating repository ${projectName}: ${error.message}`);
     throw new Error(`Failed to update repository: ${error.message}`);
@@ -117,7 +115,7 @@ async function ensureProjectExists(repoData) {
 
   if (projectExists(projectName)) {
     logger.info(`Project ${projectName} already exists`);
-    
+
     // Optionally update the repository
     try {
       await updateRepository(projectName, repoData.sourceBranch);
@@ -125,7 +123,7 @@ async function ensureProjectExists(repoData) {
         success: true,
         path: path.join(PROJECTS_DIR, projectName),
         wasCloned: false,
-        message: 'Project exists and updated'
+        message: 'Project exists and updated',
       };
     } catch (error) {
       logger.warn(`Could not update repository, continuing with existing: ${error.message}`);
@@ -133,7 +131,7 @@ async function ensureProjectExists(repoData) {
         success: true,
         path: path.join(PROJECTS_DIR, projectName),
         wasCloned: false,
-        message: 'Project exists (update failed but continuing)'
+        message: 'Project exists (update failed but continuing)',
       };
     }
   } else {
@@ -141,7 +139,7 @@ async function ensureProjectExists(repoData) {
     const result = await cloneRepository(cloneUrl, projectName);
     return {
       ...result,
-      wasCloned: true
+      wasCloned: true,
     };
   }
 }
@@ -150,6 +148,5 @@ module.exports = {
   projectExists,
   cloneRepository,
   updateRepository,
-  ensureProjectExists
+  ensureProjectExists,
 };
-

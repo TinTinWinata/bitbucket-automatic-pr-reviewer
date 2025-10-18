@@ -15,7 +15,7 @@ const prCreatedCounter = new client.Counter({
   name: 'pr_created_total',
   help: 'Total number of PRs created',
   labelNames: ['repository'],
-  registers: [register]
+  registers: [register],
 });
 
 /**
@@ -25,7 +25,7 @@ const prUpdatedCounter = new client.Counter({
   name: 'pr_updated_total',
   help: 'Total number of PRs updated',
   labelNames: ['repository'],
-  registers: [register]
+  registers: [register],
 });
 
 /**
@@ -35,7 +35,7 @@ const claudeLgtmCounter = new client.Counter({
   name: 'claude_lgtm_total',
   help: 'Total number of LGTMs (approvals) from Claude integration',
   labelNames: ['repository'],
-  registers: [register]
+  registers: [register],
 });
 
 /**
@@ -45,7 +45,7 @@ const claudeIssuesCounter = new client.Counter({
   name: 'claude_issues_found_total',
   help: 'Total number of issues found by Claude integration',
   labelNames: ['repository'],
-  registers: [register]
+  registers: [register],
 });
 
 /**
@@ -55,7 +55,7 @@ const claudeReviewSuccessCounter = new client.Counter({
   name: 'claude_review_success_total',
   help: 'Total number of PRs successfully reviewed by Claude',
   labelNames: ['repository'],
-  registers: [register]
+  registers: [register],
 });
 
 /**
@@ -65,7 +65,7 @@ const claudeReviewFailureCounter = new client.Counter({
   name: 'claude_review_failure_total',
   help: 'Total number of failed Claude reviews',
   labelNames: ['repository', 'error_type'],
-  registers: [register]
+  registers: [register],
 });
 
 /**
@@ -76,7 +76,7 @@ const claudeReviewDurationHistogram = new client.Histogram({
   help: 'Duration of Claude reviews in seconds',
   labelNames: ['repository', 'status'],
   buckets: [5, 10, 30, 60, 120, 180, 300], // 5s, 10s, 30s, 1min, 2min, 3min, 5min
-  registers: [register]
+  registers: [register],
 });
 
 // Initialize metrics with 0 to make them visible in /metrics endpoint
@@ -86,7 +86,7 @@ function initializeMetrics() {
   // Initialize with a dummy label to make metrics visible
   // These will be automatically replaced with real labels when events occur
   const dummyRepo = '_uninitialized';
-  
+
   prCreatedCounter.inc({ repository: dummyRepo }, 0);
   prUpdatedCounter.inc({ repository: dummyRepo }, 0);
   claudeLgtmCounter.inc({ repository: dummyRepo }, 0);
@@ -108,7 +108,6 @@ module.exports = {
     claudeIssuesCounter,
     claudeReviewSuccessCounter,
     claudeReviewFailureCounter,
-    claudeReviewDurationHistogram
-  }
+    claudeReviewDurationHistogram,
+  },
 };
-

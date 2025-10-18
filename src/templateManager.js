@@ -23,10 +23,7 @@ class TemplateManager {
       }
       return { defaultTemplate: 'default', repositories: {} };
     } catch (error) {
-      logger.warn(
-        'Failed to load template config, using defaults: ',
-        error.message
-      );
+      logger.warn('Failed to load template config, using defaults: ', error.message);
       return { defaultTemplate: 'default', repositories: {} };
     }
   }
@@ -47,11 +44,7 @@ class TemplateManager {
    */
   loadTemplate(templateName) {
     // Try custom template first
-    const customPath = path.join(
-      this.templatesDir,
-      'custom',
-      `${templateName}.md`
-    );
+    const customPath = path.join(this.templatesDir, 'custom', `${templateName}.md`);
 
     if (fs.existsSync(customPath)) {
       logger.info(`Loading custom template: ${templateName}`);
@@ -101,17 +94,15 @@ class TemplateManager {
 
     // Check for required sections
     const missingSectionsErrors = requiredSections
-      .filter((section) => !template.includes(section))
-      .map((section) => `Missing required section: ${section}`);
+      .filter(section => !template.includes(section))
+      .map(section => `Missing required section: ${section}`);
 
     errors = errors.concat(missingSectionsErrors);
 
     // Check for malformed variable syntax
     const malformedVars = template.match(/{{[^}]*$|^[^{]*}}/g);
     if (malformedVars) {
-      errors.push(
-        `Malformed variable syntax found: ${malformedVars.join(', ')}`
-      );
+      errors.push(`Malformed variable syntax found: ${malformedVars.join(', ')}`);
     }
 
     const variables = template.match(/{{(\w+)}}/g) || [];
@@ -127,16 +118,12 @@ class TemplateManager {
       'destinationBranch',
       'repository',
     ];
-    const foundVars = uniqueVars.map((v) => v.replace(/{{|}}/g, ''));
-    const missingRecommended = recommendedVars.filter(
-      (v) => !foundVars.includes(v)
-    );
+    const foundVars = uniqueVars.map(v => v.replace(/{{|}}/g, ''));
+    const missingRecommended = recommendedVars.filter(v => !foundVars.includes(v));
 
     if (missingRecommended.length > 0) {
       logger.warn(
-        `Note: Template is missing recommended variables: ${missingRecommended.join(
-          ', '
-        )}`
+        `Note: Template is missing recommended variables: ${missingRecommended.join(', ')}`,
       );
     }
 
