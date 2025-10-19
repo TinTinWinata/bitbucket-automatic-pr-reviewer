@@ -5,32 +5,30 @@ FROM node:20-alpine
 RUN apk add --no-cache git bash
 
 # Install Claude CLI globally
-RUN npm install -g @anthropic-ai/claude-code
+RUN npm install -g @anthropic-ai/claude-code && \
+    npm cache clean --force
 
 # Set working directory
 WORKDIR /app
-
-# Create projects directory
-RUN mkdir -p /app/projects
 
 # Copy package files
 COPY package*.json ./
 
 # Install dependencies (skip prepare script to avoid husky issues)
-RUN npm install --production --ignore-scripts
+RUN npm install --production --ignore-scripts && \
+    npm cache clean --force
 
-# Copy application source
+# Create projects directory
+RUN mkdir -p /app/projects
+
+# Copy application files
 COPY src ./src
-
-# Copy MCP configuration for Claude CLI
 COPY .mcp.json ./
-
-# Copy entrypoint script
 COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Change ownership of the app directory to the node user (already exists in base image)
-RUN chown -R node:node /app
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh && \
+    chown -R node:node /app
 
 # Set shell environment for Claude CLI
 ENV SHELL=/bin/bash
@@ -46,4 +44,3 @@ ENTRYPOINT ["docker-entrypoint.sh"]
 
 # Start the application
 CMD ["npm", "start"]
-
