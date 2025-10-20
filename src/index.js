@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { processPullRequest } = require('./claude');
 const { register, metrics } = require('./metrics');
 const logger = require('./logger').default;
+const { BitbucketPayloadSchema } = require('./schemas');
 
 dotenv.config();
 
@@ -78,9 +79,6 @@ function verifyBitbucketSignature(signature, payload, secret) {
   return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
 }
 
-/**
- * Middleware to validate Bitbucket webhook
- */
 function validateBitbucketWebhook(req, res, next) {
   // 1. Verify webhook signature (if secret is configured)
   if (BITBUCKET_WEBHOOK_SECRET) {
@@ -143,13 +141,33 @@ app.get('/metrics', async (req, res) => {
 
 // Bitbucket webhook endpoint for PR creation (with security validation)
 app.post('/webhook/bitbucket/pr', validateBitbucketWebhook, async (req, res) => {
+  let payload;
+  try {
+    // 1. VALIDATE THE PAYLOAD
+    // If req.body doesn't match the schema, Zod throws an error
+    payload = BitbucketPayloadSchema.parse(req.body);
+
+    // If we get here, the data is safe and matches our schema
+    logger.info('✅ Webhook payload validated successfully');
+  } catch (error) {
+    // 2. REJECT IF INVALID
+    // Log the validation error and send a 400 Bad Request
+    logger.warn(`🚫 Invalid webhook payload: ${error.message}`);
+    return res.status(400).json({
+      error: 'Bad Request',
+      message: 'Invalid payload structure',
+      details: error.errors, // Send Zod's error details back
+    });
+  }
+
+  // 3. PROCESS THE VALIDATED DATA
+  // All code from here on uses the "payload" variable, which we know is safe.
   try {
     logger.info('Received Bitbucket PR webhook');
     logger.info(`Event: ${req.headers['x-event-key']}`);
 
     const eventKey = req.headers['x-event-key'];
 
-    // Check if event should be processed based on configuration
     if (PROCESS_ONLY_CREATED && eventKey !== 'pullrequest:created') {
       logger.info(`⏭️  Event ignored (only processing PR creation): ${eventKey}`);
       return res.status(200).json({
@@ -158,27 +176,34 @@ app.post('/webhook/bitbucket/pr', validateBitbucketWebhook, async (req, res) => 
       });
     }
 
-    const payload = req.body;
-    const repository = payload.repository?.name || 'unknown';
+    const repository = payload.repository.name;
 
-    // Extract relevant PR information
+    // Extract relevant PR information from the SAFE "payload" object
     const prData = {
-      title: payload.pullrequest?.title || 'No title',
-      description: payload.pullrequest?.description || 'No description',
-      author: payload.pullrequest?.author?.display_name || 'Unknown',
-      sourceBranch: payload.pullrequest?.source?.branch?.name || 'Unknown',
-      destinationBranch: payload.pullrequest?.destination?.branch?.name || 'Unknown',
-      prUrl: payload.pullrequest?.links?.html?.href || 'No URL',
-      repository: payload.repository?.name || 'Unknown',
+      title: payload.pullrequest.title,
+      description: payload.pullrequest.description || 'No description',
+      author: payload.pullrequest.author.display_name,
+      sourceBranch: payload.pullrequest.source.branch.name,
+      destinationBranch: payload.pullrequest.destination.branch.name,
+      prUrl: payload.pullrequest.links.html.href,
+      repository: payload.repository.name,
+      // We can safely search this array because Zod confirmed it only contains valid URLs
       repoCloneUrl:
-        payload.repository?.links?.clone?.find(link => link.name === 'https')?.href ||
-        payload.repository?.links?.html?.href ||
-        'No clone URL',
+        payload.repository.links.clone.find(link => link.name === 'https')?.href ||
+        payload.repository.links.html.href, // Fallback to HTML URL
     };
+
+    // This check is important in case the 'https' clone link wasn't found
+    if (!prData.repoCloneUrl) {
+      logger.warn('🚫 Could not find a valid HTTPS clone URL in the payload.');
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Could not find HTTPS clone URL in payload',
+      });
+    }
 
     logger.debug(`PR Data: ${JSON.stringify(prData)}`);
 
-    // Track PR metrics based on event type
     if (eventKey === 'pullrequest:created') {
       metrics.prCreatedCounter.inc({ repository });
       logger.debug(`Metrics: Incremented PR created counter for ${repository}`);
@@ -187,14 +212,12 @@ app.post('/webhook/bitbucket/pr', validateBitbucketWebhook, async (req, res) => 
       logger.debug(`Metrics: Incremented PR updated counter for ${repository}`);
     }
 
-    // Acknowledge receipt immediately
     res.status(200).json({
       message: 'Webhook received successfully',
       prTitle: prData.title,
       queuePosition: reviewQueue.length + 1,
     });
 
-    // Add to queue and process sequentially (prevents branch conflicts)
     reviewQueue.push(prData);
     logger.info(`✅ PR added to queue: ${prData.title} (queue size: ${reviewQueue.length})`);
     processQueue();

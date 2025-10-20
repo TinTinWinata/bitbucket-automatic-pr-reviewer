@@ -19,3 +19,4 @@ docker-compose.yml
 
 coverage/
 *.backup
+me/
