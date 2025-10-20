@@ -3,11 +3,16 @@ jest.mock('../src/git', () => ({
 }));
 
 jest.mock('../src/metrics', () => ({
-  claudeReviewSuccessCounter: { inc: jest.fn() },
-  claudeReviewFailureCounter: { inc: jest.fn() },
-  claudeReviewDurationHistogram: { observe: jest.fn() },
-  claudeLgtmCounter: { inc: jest.fn() },
-  claudeIssuesCounter: { inc: jest.fn() },
+  register: {},
+  metrics: {
+    prCreatedCounter: { inc: jest.fn() },
+    prUpdatedCounter: { inc: jest.fn() },
+    claudeLgtmCounter: { inc: jest.fn() },
+    claudeIssuesCounter: { inc: jest.fn() },
+    claudeReviewSuccessCounter: { inc: jest.fn() },
+    claudeReviewFailureCounter: { inc: jest.fn() },
+    claudeReviewDurationHistogram: { observe: jest.fn() },
+  },
 }));
 
 jest.mock('../src/templateManager', () => {
