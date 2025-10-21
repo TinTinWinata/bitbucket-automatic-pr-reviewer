@@ -144,10 +144,7 @@ app.post('/webhook/bitbucket/pr', validateBitbucketWebhook, async (req, res) => 
   let payload;
   try {
     // 1. VALIDATE THE PAYLOAD
-    // If req.body doesn't match the schema, Zod throws an error
     payload = BitbucketPayloadSchema.parse(req.body);
-
-    // If we get here, the data is safe and matches our schema
     logger.info('✅ Webhook payload validated successfully');
   } catch (error) {
     // 2. REJECT IF INVALID
@@ -156,12 +153,11 @@ app.post('/webhook/bitbucket/pr', validateBitbucketWebhook, async (req, res) => 
     return res.status(400).json({
       error: 'Bad Request',
       message: 'Invalid payload structure',
-      details: error.errors, // Send Zod's error details back
+      details: error.errors,
     });
   }
 
   // 3. PROCESS THE VALIDATED DATA
-  // All code from here on uses the "payload" variable, which we know is safe.
   try {
     logger.info('Received Bitbucket PR webhook');
     logger.info(`Event: ${req.headers['x-event-key']}`);
@@ -178,7 +174,6 @@ app.post('/webhook/bitbucket/pr', validateBitbucketWebhook, async (req, res) => 
 
     const repository = payload.repository.name;
 
-    // Extract relevant PR information from the SAFE "payload" object
     const prData = {
       title: payload.pullrequest.title,
       description: payload.pullrequest.description || 'No description',
@@ -187,13 +182,11 @@ app.post('/webhook/bitbucket/pr', validateBitbucketWebhook, async (req, res) => 
       destinationBranch: payload.pullrequest.destination.branch.name,
       prUrl: payload.pullrequest.links.html.href,
       repository: payload.repository.name,
-      // We can safely search this array because Zod confirmed it only contains valid URLs
       repoCloneUrl:
         payload.repository.links.clone.find(link => link.name === 'https')?.href ||
-        payload.repository.links.html.href, // Fallback to HTML URL
+        payload.repository.links.html.href,
     };
 
-    // This check is important in case the 'https' clone link wasn't found
     if (!prData.repoCloneUrl) {
       logger.warn('🚫 Could not find a valid HTTPS clone URL in the payload.');
       return res.status(400).json({
