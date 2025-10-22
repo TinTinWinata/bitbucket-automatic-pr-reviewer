@@ -5,11 +5,17 @@ const { processPullRequest } = require('./claude');
 const { register, metrics } = require('./metrics');
 const logger = require('./logger').default;
 const { BitbucketPayloadSchema } = require('./schemas');
+const CircuitBreaker = require('./CircuitBreaker');
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+const failureThreshold = parseInt(process.env.CB_FAILURE_THRESHOLD || '3');
+const resetTimeout = parseInt(process.env.CB_RESET_TIMEOUT_MS || '30000');
+
+const claudeCircuitBreaker = new CircuitBreaker(failureThreshold, resetTimeout);
 
 // Security Configuration
 const BITBUCKET_WEBHOOK_SECRET = process.env.BITBUCKET_WEBHOOK_SECRET;
@@ -38,9 +44,18 @@ async function processQueue() {
   logger.info(`📋 Processing PR from queue: ${prData.title} (${reviewQueue.length} remaining)`);
 
   try {
+    if (!claudeCircuitBreaker.canAttempt()) {
+      logger.error('🚫 Circuit breaker is OPEN. Skipping PR review to avoid system overload.');
+      return;
+    }
+
     await processPullRequest(prData);
+
+    logger.info('✅ Claude PR review succeeded');
+    claudeCircuitBreaker.recordSuccess();
   } catch (error) {
     logger.error(`Error processing PR with Claude: ${error.message}`);
+    claudeCircuitBreaker.recordFailure();
   }
 
   isProcessing = false;
