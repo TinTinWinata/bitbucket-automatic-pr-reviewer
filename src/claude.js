@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { ensureProjectExists } = require('./git');
 const { metrics } = require('./metrics');
-const TemplateManager = require('./templateManager');
+const TemplateManager = require('./template-manager');
 const logger = require('./logger').default;
 
 /**

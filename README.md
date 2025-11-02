@@ -90,7 +90,7 @@ This implementation uses **Claude CLI** instead of the Anthropic API:
 │   ├── git.js            # Git operations (clone, update, validate)
 │   ├── metrics.js        # Prometheus metrics collection
 │   ├── logger.js         # Logging configuration
-│   └── templateManager.js # Template management for PR reviews
+│   └── template-manager.js # Template management for PR reviews
 ├── tests/                # Unit tests directory
 │   ├── claude.test.js    # Tests for Claude.js functionality
 │   ├── git.test.js       # Tests for Git operations
