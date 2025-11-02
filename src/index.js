@@ -5,7 +5,7 @@ const { processPullRequest } = require('./claude');
 const { register, metrics } = require('./metrics');
 const logger = require('./logger').default;
 const { BitbucketPayloadSchema } = require('./schemas');
-const CircuitBreaker = require('./CircuitBreaker');
+const CircuitBreaker = require('./circuit-breaker');
 
 dotenv.config();
 

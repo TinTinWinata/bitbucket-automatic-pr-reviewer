@@ -15,7 +15,7 @@ jest.mock('../src/metrics', () => ({
   },
 }));
 
-jest.mock('../src/templateManager', () => {
+jest.mock('../src/template-manager', () => {
   return jest.fn().mockImplementation(() => {
     return {
       getPromptForPR: jest.fn(() => 'Mocked PR prompt'),
