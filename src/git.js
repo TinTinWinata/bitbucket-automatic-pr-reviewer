@@ -80,12 +80,6 @@ async function updateRepository(projectName, branch) {
 
     logger.debug(`Branch: ${branch}`);
 
-    // Checkout branch if specified
-    if (branch) {
-      logger.info(`Checking out branch: ${branch}`);
-      await execAsync(`git -C "${projectPath}" checkout "${branch}"`);
-    }
-
     // Reset to match remote branch exactly (avoids divergent branches issues)
     const branchName = branch || 'main';
     const { stdout } = await execAsync(`git -C "${projectPath}" reset --hard origin/${branchName}`);
@@ -113,10 +107,16 @@ async function ensureProjectExists(repoData) {
 
   logger.info(`Checking if project ${projectName} exists...`);
 
+  if (!repoData.sourceBranch) {
+    return {
+      success: false,
+      message: 'Source branch is required',
+    };
+  }
+
   if (projectExists(projectName)) {
     logger.info(`Project ${projectName} already exists`);
 
-    // Optionally update the repository
     try {
       await updateRepository(projectName, repoData.sourceBranch);
       return {
@@ -128,7 +128,7 @@ async function ensureProjectExists(repoData) {
     } catch (error) {
       logger.warn(`Could not update repository, continuing with existing: ${error.message}`);
       return {
-        success: true,
+        success: false,
         path: path.join(PROJECTS_DIR, projectName),
         wasCloned: false,
         message: 'Project exists (update failed but continuing)',
