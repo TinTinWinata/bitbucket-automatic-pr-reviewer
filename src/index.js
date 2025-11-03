@@ -198,7 +198,7 @@ app.post('/webhook/bitbucket/pr', validateBitbucketWebhook, async (req, res) => 
       prUrl: payload.pullrequest.links.html.href,
       repository: payload.repository.name,
       repoCloneUrl:
-        payload.repository.links.clone.find(link => link.name === 'https')?.href ||
+        payload.repository.links.clone?.find(link => link.name === 'https')?.href ||
         payload.repository.links.html.href,
     };
 

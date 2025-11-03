@@ -401,7 +401,13 @@ To create a Bitbucket App Password:
 `),
       );
 
-      const { token } = await inquirer.prompt([
+      const { user, token } = await inquirer.prompt([
+        {
+          type: 'input',
+          name: 'user',
+          message: 'Enter your Bitbucket username:',
+          validate: input => input.trim().length > 0 || 'Username is required',
+        },
         {
           type: 'password',
           name: 'token',
@@ -410,6 +416,7 @@ To create a Bitbucket App Password:
         },
       ]);
 
+      this.config.bitbucketUser = user.trim();
       this.config.bitbucketToken = token;
     } else {
       const { user, password } = await inquirer.prompt([
@@ -509,6 +516,103 @@ To create a Bitbucket App Password:
       }
     } else {
       this.config.webhookSecret = '';
+    }
+
+    // Metrics Persistence Configuration
+    const { enableMetricsPersistence } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'enableMetricsPersistence',
+        message: 'Enable metrics persistence (survives restarts/rebuilds)?',
+        default: false,
+      },
+    ]);
+
+    this.config.metricsPersistenceEnabled = enableMetricsPersistence;
+
+    if (enableMetricsPersistence) {
+      const isMacOS = process.platform === 'darwin';
+
+      if (isMacOS) {
+        // Automatically use filesystem on macOS
+        this.config.metricsPersistenceType = 'filesystem';
+        console.log(
+          chalk.yellow(
+            '⚠️  macOS detected: Using filesystem storage (SQLite has native binding issues on macOS)',
+          ),
+        );
+        console.log(
+          chalk.gray('   Linux servers support SQLite - you can enable it manually if needed.'),
+        );
+      } else {
+        // Show choice for Linux and other platforms
+        const { persistenceType } = await inquirer.prompt([
+          {
+            type: 'list',
+            name: 'persistenceType',
+            message: 'Choose metrics storage type:',
+            choices: [
+              {
+                name: '📁 Filesystem (JSON file - recommended)',
+                value: 'filesystem',
+              },
+              {
+                name: '🗄️  SQLite (Database - better for high volume)',
+                value: 'sqlite',
+              },
+            ],
+            default: 'filesystem',
+          },
+        ]);
+
+        this.config.metricsPersistenceType = persistenceType;
+      }
+
+      const { customPath } = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'customPath',
+          message: 'Use custom storage path?',
+          default: false,
+        },
+      ]);
+
+      if (customPath) {
+        const { persistencePath } = await inquirer.prompt([
+          {
+            type: 'input',
+            name: 'persistencePath',
+            message: 'Enter metrics storage path:',
+            default: './metrics-storage',
+            validate: input => input.trim().length > 0 || 'Storage path is required',
+          },
+        ]);
+        this.config.metricsPersistencePath = persistencePath.trim();
+      } else {
+        this.config.metricsPersistencePath = './metrics-storage';
+      }
+
+      const { customInterval } = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'customInterval',
+          message: 'Use custom save interval (default: 30 seconds)?',
+          default: false,
+        },
+      ]);
+
+      if (customInterval) {
+        const { saveInterval } = await inquirer.prompt([
+          {
+            type: 'number',
+            name: 'saveInterval',
+            message: 'Enter save interval in milliseconds:',
+            default: 30000,
+            validate: input => input > 0 || 'Save interval must be greater than 0',
+          },
+        ]);
+        this.config.metricsPersistenceSaveInterval = saveInterval;
+      }
     }
   }
 

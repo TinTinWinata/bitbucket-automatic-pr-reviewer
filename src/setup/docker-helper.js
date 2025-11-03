@@ -73,6 +73,10 @@ services:
       - BITBUCKET_WEBHOOK_SECRET=\${BITBUCKET_WEBHOOK_SECRET}
       - ALLOWED_WORKSPACE=\${ALLOWED_WORKSPACE:-xriopteam}
       - PROCESS_ONLY_CREATED=\${PROCESS_ONLY_CREATED:-false}
+      - METRICS_PERSISTENCE_ENABLED=\${METRICS_PERSISTENCE_ENABLED:-false}
+      - METRICS_PERSISTENCE_TYPE=\${METRICS_PERSISTENCE_TYPE:-filesystem}
+      - METRICS_PERSISTENCE_PATH=\${METRICS_PERSISTENCE_PATH:-/app/metrics-storage}
+      - METRICS_PERSISTENCE_SAVE_INTERVAL_MS=\${METRICS_PERSISTENCE_SAVE_INTERVAL_MS:-30000}
       - SHELL=/bin/bash
     env_file:
       - .env
@@ -80,6 +84,7 @@ services:
       - ./src:/app/src
       - ./logs:/app/logs
       - ./projects:/app/projects
+      - ./metrics-storage:/app/metrics-storage
       - ./.mcp.json:/app/.mcp.json
       - ./claude-config/.claude.json:/home/node/.claude.json
       - ./claude-config/.claude:/home/node/.claude
