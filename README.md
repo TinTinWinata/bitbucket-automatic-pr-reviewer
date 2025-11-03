@@ -294,6 +294,10 @@ The system automatically handles git operations:
 | `ALLOWED_WORKSPACE` | No | `xriopteam` | Bitbucket workspace/organization slug to accept webhooks from |
 | `PROCESS_ONLY_CREATED` | No | `false` | Set to `true` to only process PR creation events (ignore updates) |
 | `PORT` | No | `3000` | Server port |
+| `METRICS_PERSISTENCE_ENABLED` | No | `false` | Enable metrics persistence to survive restarts/rebuilds |
+| `METRICS_PERSISTENCE_TYPE` | No | `filesystem` | Storage type: `filesystem` or `sqlite` |
+| `METRICS_PERSISTENCE_PATH` | No | `./metrics-storage` | Path to store metrics data |
+| `METRICS_PERSISTENCE_SAVE_INTERVAL_MS` | No | `30000` | Save interval in milliseconds (30 seconds) |
 
 \* Use either `BITBUCKET_TOKEN` or `BITBUCKET_USER` + `BITBUCKET_PASSWORD`
 
@@ -414,6 +418,78 @@ See [PROMETHEUS.md](./PROMETHEUS.md) for:
 - Sample PromQL queries
 
 **Note**: Prometheus is already configured in `/workspace/monitoring/prometheus.yml` to scrape metrics from `pr-automation:3000`.
+
+### Metrics Persistence
+
+By default, metrics are stored in memory and reset when the application restarts. You can enable metrics persistence to preserve metrics across restarts and container rebuilds.
+
+#### Enable Metrics Persistence
+
+Add these environment variables to your `.env` file:
+
+```env
+METRICS_PERSISTENCE_ENABLED=true
+METRICS_PERSISTENCE_TYPE=filesystem
+METRICS_PERSISTENCE_PATH=./metrics-storage
+METRICS_PERSISTENCE_SAVE_INTERVAL_MS=30000
+```
+
+#### Storage Types
+
+**Filesystem (Recommended for most use cases)**
+- Stores metrics in a JSON file
+- Simple and easy to inspect
+- Works well for small to medium deployments
+- Default storage type
+
+**SQLite (Recommended for larger deployments)**
+- Stores metrics in a SQLite database
+- Better performance for high-volume metrics
+- Requires `better-sqlite3` package (automatically installed)
+- Falls back to filesystem if SQLite is unavailable
+
+#### Configuration Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `METRICS_PERSISTENCE_ENABLED` | Enable/disable persistence | `false` |
+| `METRICS_PERSISTENCE_TYPE` | Storage type: `filesystem` or `sqlite` | `filesystem` |
+| `METRICS_PERSISTENCE_PATH` | Path to store metrics (relative or absolute) | `./metrics-storage` |
+| `METRICS_PERSISTENCE_SAVE_INTERVAL_MS` | How often to save metrics (milliseconds) | `30000` (30 seconds) |
+
+#### Docker Setup
+
+When using Docker, make sure to mount the metrics storage directory as a volume:
+
+```yaml
+volumes:
+  - ./metrics-storage:/app/metrics-storage
+```
+
+This ensures metrics persist even when the container is rebuilt.
+
+#### How It Works
+
+1. **On Startup**: The application loads persisted metrics from storage and restores them to the Prometheus registry
+2. **During Runtime**: Metrics are automatically saved every 30 seconds (configurable via `METRICS_PERSISTENCE_SAVE_INTERVAL_MS`)
+3. **On Shutdown**: Metrics are saved one final time before the process exits
+
+#### Backward Compatibility
+
+- Metrics persistence is **opt-in** - disabled by default
+- If persistence fails to initialize, the application continues without persistence (logs a warning)
+- Existing deployments without persistence continue to work as before
+
+#### Troubleshooting
+
+**Metrics not persisting:**
+- Check that `METRICS_PERSISTENCE_ENABLED=true` is set
+- Verify the storage path is writable
+- Check application logs for persistence-related errors
+
+**Permission errors:**
+- Ensure the storage directory exists and is writable
+- In Docker, verify volume mounts are configured correctly
 
 ## Contributing
 

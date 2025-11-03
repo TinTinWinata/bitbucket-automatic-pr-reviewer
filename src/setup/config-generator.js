@@ -66,7 +66,21 @@ class ConfigGenerator {
       envContent += '# Enable console logging (default: true)\n';
       envContent += `LOG_ENABLE_CONSOLE=${config.logConsole !== false ? 'true' : 'false'}\n`;
       envContent += '# Enable file logging (default: true)\n';
-      envContent += `LOG_ENABLE_FILE=${config.logFile !== false ? 'true' : 'false'}\n`;
+      envContent += `LOG_ENABLE_FILE=${config.logFile !== false ? 'true' : 'false'}\n\n`;
+
+      // Metrics Persistence Configuration
+      envContent += '# Metrics Persistence Configuration\n';
+      envContent += '# Enable metrics persistence to survive restarts/rebuilds (default: false)\n';
+      envContent += `METRICS_PERSISTENCE_ENABLED=${config.metricsPersistenceEnabled === true ? 'true' : 'false'}\n`;
+      if (config.metricsPersistenceEnabled) {
+        envContent += "# Storage type: 'filesystem' or 'sqlite' (default: filesystem)\n";
+        envContent += `METRICS_PERSISTENCE_TYPE=${config.metricsPersistenceType || 'filesystem'}\n`;
+        envContent += '# Path to store metrics (default: ./metrics-storage)\n';
+        envContent += `METRICS_PERSISTENCE_PATH=${config.metricsPersistencePath || './metrics-storage'}\n`;
+        envContent += '# Save interval in milliseconds (default: 30000 = 30 seconds)\n';
+        envContent += `METRICS_PERSISTENCE_SAVE_INTERVAL_MS=${config.metricsPersistenceSaveInterval || 30000}\n`;
+      }
+      envContent += '\n';
 
       await fs.writeFile(this.envPath, envContent);
       console.log(chalk.green('✓ Generated .env file'));
@@ -136,6 +150,13 @@ class ConfigGenerator {
     console.log(`  Process Only Created: ${config.processOnlyCreated ? 'Yes' : 'No'}`);
     console.log(`  Webhook Secret: ${config.webhookSecret ? '✓ Set' : '✗ Not set'}`);
 
+    console.log(chalk.yellow('\nMetrics Persistence Configuration:'));
+    console.log(`  Enabled: ${config.metricsPersistenceEnabled ? 'Yes' : 'No'}`);
+    if (config.metricsPersistenceEnabled) {
+      console.log(`  Type: ${config.metricsPersistenceType || 'filesystem'}`);
+      console.log(`  Path: ${config.metricsPersistencePath || './metrics-storage'}`);
+    }
+
     console.log(chalk.cyan('\n' + '─'.repeat(50)));
   }
 
@@ -179,6 +200,7 @@ class ConfigGenerator {
       path.join(this.projectRoot, 'logs'),
       path.join(this.projectRoot, 'projects'),
       path.join(this.projectRoot, 'claude-config'),
+      path.join(this.projectRoot, 'metrics-storage'),
     ];
 
     for (const dir of directories) {

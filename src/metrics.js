@@ -1,10 +1,23 @@
 const client = require('prom-client');
+const MetricsPersistence = require('./metrics-persistence');
+const logger = require('./logger').default;
 
 // Create a Registry to register the metrics
 const register = new client.Registry();
 
 // Add default metrics (memory, CPU, etc.)
 client.collectDefaultMetrics({ register });
+
+// Initialize metrics persistence
+const persistenceEnabled = process.env.METRICS_PERSISTENCE_ENABLED === 'true';
+const persistenceType = process.env.METRICS_PERSISTENCE_TYPE || 'filesystem';
+const persistencePath = process.env.METRICS_PERSISTENCE_PATH;
+
+const persistence = new MetricsPersistence({
+  enabled: persistenceEnabled,
+  type: persistenceType,
+  storagePath: persistencePath,
+});
 
 // Define custom metrics for PR automation
 
@@ -99,6 +112,64 @@ function initializeMetrics() {
 // Initialize metrics on module load
 initializeMetrics();
 
+// Load persisted metrics if persistence is enabled
+if (persistenceEnabled) {
+  try {
+    const metricsData = persistence.load();
+    if (
+      Object.keys(metricsData.counters).length > 0 ||
+      Object.keys(metricsData.histograms).length > 0
+    ) {
+      persistence.restoreMetrics(register, metricsData, {
+        prCreatedCounter,
+        prUpdatedCounter,
+        claudeLgtmCounter,
+        claudeIssuesCounter,
+        claudeReviewSuccessCounter,
+        claudeReviewFailureCounter,
+        claudeReviewDurationHistogram,
+      });
+      logger.info('✅ Loaded persisted metrics from storage');
+    }
+  } catch (error) {
+    logger.error(`Failed to load persisted metrics: ${error.message}`);
+  }
+}
+
+// Periodically save metrics (every 30 seconds)
+let saveInterval = null;
+if (persistenceEnabled) {
+  const saveIntervalMs = parseInt(process.env.METRICS_PERSISTENCE_SAVE_INTERVAL_MS || '30000');
+  saveInterval = setInterval(() => {
+    try {
+      const metricsData = persistence.extractMetricsData(register);
+      persistence.save(metricsData);
+      logger.debug('Metrics saved to persistence storage');
+    } catch (error) {
+      logger.error(`Failed to save metrics: ${error.message}`);
+    }
+  }, saveIntervalMs);
+
+  // Save metrics on process exit
+  const saveMetricsOnShutdown = () => {
+    if (saveInterval) {
+      clearInterval(saveInterval);
+      saveInterval = null;
+    }
+    try {
+      const metricsData = persistence.extractMetricsData(register);
+      persistence.save(metricsData);
+      persistence.close();
+      logger.info('Metrics saved before shutdown');
+    } catch (error) {
+      logger.error(`Failed to save metrics on shutdown: ${error.message}`);
+    }
+  };
+
+  process.on('SIGTERM', saveMetricsOnShutdown);
+  process.on('SIGINT', saveMetricsOnShutdown);
+}
+
 module.exports = {
   register,
   metrics: {
@@ -110,4 +181,5 @@ module.exports = {
     claudeReviewFailureCounter,
     claudeReviewDurationHistogram,
   },
+  persistence,
 };

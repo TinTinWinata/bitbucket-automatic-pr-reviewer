@@ -31,12 +31,14 @@ const BitbucketPayloadSchema = z.object({
   repository: z.object({
     name: z.string(),
     links: z.object({
-      clone: z.array(
-        z.object({
-          name: z.string(),
-          href: z.string().url(),
-        }),
-      ),
+      clone: z
+        .array(
+          z.object({
+            name: z.string(),
+            href: z.string().url(),
+          }),
+        )
+        .optional(),
       html: z.object({
         href: z.string().url(),
       }),
