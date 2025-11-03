@@ -382,12 +382,25 @@ To create a Bitbucket App Password:
 `),
     );
 
-    const { user, token } = await inquirer.prompt([
+    const { user, email, token } = await inquirer.prompt([
       {
         type: 'input',
         name: 'user',
         message: 'Enter your Bitbucket username:',
         validate: input => input.trim().length > 0 || 'Username is required',
+      },
+      {
+        type: 'input',
+        name: 'email',
+        message: 'Enter your Bitbucket user email:',
+        validate: input => {
+          const trimmed = input.trim();
+          if (trimmed.length === 0) return 'Email is required';
+          // Basic email validation
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(trimmed)) return 'Please enter a valid email address';
+          return true;
+        },
       },
       {
         type: 'password',
@@ -398,6 +411,7 @@ To create a Bitbucket App Password:
     ]);
 
     this.config.bitbucketUser = user.trim();
+    this.config.bitbucketUserEmail = email.trim();
     this.config.bitbucketToken = token;
 
     const { workspace } = await inquirer.prompt([
