@@ -23,7 +23,6 @@ RUN mkdir -p /app/projects
 
 # Copy application files
 COPY src ./src
-COPY .mcp.json ./
 COPY docker-entrypoint.sh /usr/local/bin/
 
 # Change ownership of the app directory to the node user (already exists in base image)
