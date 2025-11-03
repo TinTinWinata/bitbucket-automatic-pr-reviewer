@@ -102,33 +102,22 @@ class ConfigGenerator {
       if (await fs.pathExists(this.claudeConfigPath)) {
         claudeConfig = await fs.readJSON(this.claudeConfigPath);
       } else {
-        claudeConfig = { projects: {} };
+        claudeConfig = {};
       }
 
-      // Ensure projects object exists
-      if (!claudeConfig.projects) {
-        claudeConfig.projects = {};
-      }
-
-      // Use /app as the project path (matches Docker container)
-      const projectPath = '/app';
-      if (!claudeConfig.projects[projectPath]) {
-        claudeConfig.projects[projectPath] = {};
-      }
-
-      // Ensure mcpServers object exists for the project
-      if (!claudeConfig.projects[projectPath].mcpServers) {
-        claudeConfig.projects[projectPath].mcpServers = {};
+      // Ensure mcpServers object exists at root level (user-level configuration)
+      if (!claudeConfig.mcpServers) {
+        claudeConfig.mcpServers = {};
       }
 
       // Add Bitbucket server configuration if provided
-      if (config.bitbucketUser && config.bitbucketToken) {
-        claudeConfig.projects[projectPath].mcpServers['bit-bucket-server'] = {
+      if (config.bitbucketUserEmail && config.bitbucketToken) {
+        claudeConfig.mcpServers['bit-bucket-server'] = {
           type: 'stdio',
           command: 'npx',
           args: ['-y', '@tintinwinata/mcp-server-atlassian-bitbucket'],
           env: {
-            ATLASSIAN_USER_EMAIL: config.bitbucketUser,
+            ATLASSIAN_USER_EMAIL: config.bitbucketUserEmail,
             ATLASSIAN_API_TOKEN: config.bitbucketToken,
           },
         };
@@ -158,6 +147,7 @@ class ConfigGenerator {
     console.log(chalk.yellow('\nBitbucket Configuration:'));
     console.log(`  Workspace: ${config.workspace || 'xriopteam'}`);
     console.log(`  User: ${config.bitbucketUser || 'Not set'}`);
+    console.log(`  Email: ${config.bitbucketUserEmail || 'Not set'}`);
     console.log(`  Token: ${config.bitbucketToken ? '✓ Set' : '✗ Not set'}`);
 
     console.log(chalk.yellow('\nServer Configuration:'));
@@ -187,8 +177,8 @@ class ConfigGenerator {
     }
 
     // Validate Bitbucket configuration
-    if (!config.bitbucketToken || !config.bitbucketUser) {
-      errors.push('Bitbucket token and username are required');
+    if (!config.bitbucketToken || !config.bitbucketUser || !config.bitbucketUserEmail) {
+      errors.push('Bitbucket token, username, and email are required');
     }
 
     if (!config.workspace) {
