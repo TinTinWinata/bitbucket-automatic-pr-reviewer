@@ -84,7 +84,6 @@ services:
       - ./logs:/app/logs
       - ./projects:/app/projects
       - ./metrics-storage:/app/metrics-storage
-      - ./.mcp.json:/app/.mcp.json
       - ./claude-config/.claude.json:/home/node/.claude.json
       - ./claude-config/.claude:/home/node/.claude
 `;

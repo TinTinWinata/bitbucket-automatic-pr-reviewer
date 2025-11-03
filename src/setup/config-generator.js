@@ -6,7 +6,7 @@ class ConfigGenerator {
   constructor() {
     this.projectRoot = process.cwd();
     this.envPath = path.join(this.projectRoot, '.env');
-    this.mcpPath = path.join(this.projectRoot, '.mcp.json');
+    this.claudeConfigPath = path.join(this.projectRoot, 'claude-config', '.claude.json');
   }
 
   /**
@@ -89,22 +89,41 @@ class ConfigGenerator {
   }
 
   /**
-   * Generate or update .mcp.json configuration
+   * Generate or update MCP servers in .claude.json configuration
    */
   async generateMcpConfig(config) {
     try {
-      let mcpConfig;
+      // Ensure claude-config directory exists
+      await fs.ensureDir(path.dirname(this.claudeConfigPath));
 
-      // Check if .mcp.json already exists
-      if (await fs.pathExists(this.mcpPath)) {
-        mcpConfig = await fs.readJSON(this.mcpPath);
+      let claudeConfig;
+
+      // Check if .claude.json already exists
+      if (await fs.pathExists(this.claudeConfigPath)) {
+        claudeConfig = await fs.readJSON(this.claudeConfigPath);
       } else {
-        mcpConfig = { mcpServers: {} };
+        claudeConfig = { projects: {} };
+      }
+
+      // Ensure projects object exists
+      if (!claudeConfig.projects) {
+        claudeConfig.projects = {};
+      }
+
+      // Use /app as the project path (matches Docker container)
+      const projectPath = '/app';
+      if (!claudeConfig.projects[projectPath]) {
+        claudeConfig.projects[projectPath] = {};
+      }
+
+      // Ensure mcpServers object exists for the project
+      if (!claudeConfig.projects[projectPath].mcpServers) {
+        claudeConfig.projects[projectPath].mcpServers = {};
       }
 
       // Add Bitbucket server configuration if provided
       if (config.bitbucketUser && config.bitbucketToken) {
-        mcpConfig.mcpServers['bit-bucket-server'] = {
+        claudeConfig.projects[projectPath].mcpServers['bit-bucket-server'] = {
           type: 'stdio',
           command: 'npx',
           args: ['-y', '@tintinwinata/mcp-server-atlassian-bitbucket'],
@@ -113,13 +132,13 @@ class ConfigGenerator {
             ATLASSIAN_API_TOKEN: config.bitbucketToken,
           },
         };
-        console.log(chalk.green('✓ Added Bitbucket MCP server configuration'));
+        console.log(chalk.green('✓ Added Bitbucket MCP server configuration to .claude.json'));
       }
 
-      await fs.writeJSON(this.mcpPath, mcpConfig, { spaces: 4 });
+      await fs.writeJSON(this.claudeConfigPath, claudeConfig, { spaces: 2 });
       return true;
     } catch (error) {
-      console.error(chalk.red('✗ Failed to generate .mcp.json:'), error.message);
+      console.error(chalk.red('✗ Failed to update .claude.json with MCP servers:'), error.message);
       return false;
     }
   }

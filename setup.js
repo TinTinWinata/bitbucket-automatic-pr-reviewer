@@ -623,10 +623,10 @@ To create a Bitbucket App Password:
       throw new Error('Failed to generate .env file');
     }
 
-    // Generate .mcp.json
+    // Generate MCP server configuration in .claude.json
     const mcpSuccess = await this.configGenerator.generateMcpConfig(this.config);
     if (!mcpSuccess) {
-      console.log(chalk.yellow('⚠ Warning: Failed to generate .mcp.json'));
+      console.log(chalk.yellow('⚠ Warning: Failed to update .claude.json with MCP servers'));
     }
 
     console.log(chalk.green('✓ Configuration files generated'));
