@@ -18,7 +18,7 @@ A simple Docker-based automation service that receives Bitbucket pull request we
 
 - Docker and Docker Compose installed
 - Bitbucket repository with webhook access
-- Bitbucket credentials (App Password or Personal Access Token)
+- Bitbucket credentials (App Password token and username)
 
 **Note:** This uses Claude CLI (installed globally in Docker), **not** the Anthropic API, so you don't need an API key!
 
@@ -267,19 +267,14 @@ The system automatically handles git operations:
 
 - **Clone**: If repository doesn't exist, clones from Bitbucket
 - **Update**: If repository exists, pulls latest changes
-- **Authentication**: Uses credentials from environment variables
+- **Authentication**: Uses token and username from environment variables
 
-### Supported Authentication Methods
+### Supported Authentication Method
 
-1. **App Password/Token** (recommended):
-   ```env
-   BITBUCKET_TOKEN=your-token-here
-   ```
-
-2. **Username and Password**:
+**App Password (Token + User):**
    ```env
    BITBUCKET_USER=your-username
-   BITBUCKET_PASSWORD=your-password
+   BITBUCKET_TOKEN=your-token-here
    ```
 
 ## Environment Variables
@@ -287,9 +282,8 @@ The system automatically handles git operations:
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `CLAUDE_MODEL` | No | `sonnet` | Claude model: `haiku`, `sonnet`, or `opus` |
-| `BITBUCKET_TOKEN` | Yes* | - | Bitbucket App Password or Token |
-| `BITBUCKET_USER` | Yes* | - | Bitbucket username (if not using token) |
-| `BITBUCKET_PASSWORD` | Yes* | - | Bitbucket password (if not using token) |
+| `BITBUCKET_TOKEN` | Yes | - | Bitbucket App Password or Token |
+| `BITBUCKET_USER` | Yes | - | Bitbucket username |
 | `BITBUCKET_WEBHOOK_SECRET` | Recommended | - | Webhook signature validation secret |
 | `ALLOWED_WORKSPACE` | No | `xriopteam` | Bitbucket workspace/organization slug to accept webhooks from |
 | `PROCESS_ONLY_CREATED` | No | `false` | Set to `true` to only process PR creation events (ignore updates) |
@@ -298,8 +292,6 @@ The system automatically handles git operations:
 | `METRICS_PERSISTENCE_TYPE` | No | `filesystem` | Storage type: `filesystem` or `sqlite` |
 | `METRICS_PERSISTENCE_PATH` | No | `./metrics-storage` | Path to store metrics data |
 | `METRICS_PERSISTENCE_SAVE_INTERVAL_MS` | No | `30000` | Save interval in milliseconds (30 seconds) |
-
-\* Use either `BITBUCKET_TOKEN` or `BITBUCKET_USER` + `BITBUCKET_PASSWORD`
 
 ## Troubleshooting
 

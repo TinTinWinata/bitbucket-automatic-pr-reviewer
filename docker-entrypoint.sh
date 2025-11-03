@@ -28,19 +28,9 @@ elif [ -n "$BITBUCKET_TOKEN" ]; then
     git config --global credential.helper ""
     
     echo "Git credentials configured successfully (x-token-auth format)"
-elif [ -n "$BITBUCKET_USER" ] && [ -n "$BITBUCKET_PASSWORD" ]; then
-    echo "Configuring Git credentials with username/password..."
-    
-    # Configure Git credential helper using URL-specific insteadOf
-    git config --global url."https://${BITBUCKET_USER}:${BITBUCKET_PASSWORD}@bitbucket.org".insteadOf "https://bitbucket.org"
-    
-    # Also disable interactive credential prompts
-    git config --global core.askPass ""
-    git config --global credential.helper ""
-    
-    echo "Git credentials configured successfully (username:password format)"
 else
     echo "Warning: No Bitbucket credentials provided. Git operations may require authentication."
+    echo "Please provide BITBUCKET_USER and BITBUCKET_TOKEN environment variables."
 fi
 
 echo "Running as user: $(whoami) (UID: $(id -u))"

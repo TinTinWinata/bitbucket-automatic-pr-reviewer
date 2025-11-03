@@ -371,27 +371,8 @@ class SetupWizard {
   async setupBitbucketConfig() {
     console.log(chalk.blue('\n🔧 Setting up Bitbucket configuration...'));
 
-    const { authMethod } = await inquirer.prompt([
-      {
-        type: 'list',
-        name: 'authMethod',
-        message: 'Choose Bitbucket authentication method:',
-        choices: [
-          {
-            name: '🎫 App Password (recommended)',
-            value: 'token',
-          },
-          {
-            name: '👤 Username + Password',
-            value: 'credentials',
-          },
-        ],
-      },
-    ]);
-
-    if (authMethod === 'token') {
-      console.log(
-        chalk.cyan(`
+    console.log(
+      chalk.cyan(`
 To create a Bitbucket App Password:
 1. Go to Bitbucket → Personal Settings → App passwords
 2. Click "Create app password"
@@ -399,45 +380,25 @@ To create a Bitbucket App Password:
 4. Permissions: Select "Repositories: Read" and "Pull requests: Read"
 5. Copy the generated password
 `),
-      );
+    );
 
-      const { user, token } = await inquirer.prompt([
-        {
-          type: 'input',
-          name: 'user',
-          message: 'Enter your Bitbucket username:',
-          validate: input => input.trim().length > 0 || 'Username is required',
-        },
-        {
-          type: 'password',
-          name: 'token',
-          message: 'Enter your Bitbucket App Password:',
-          validate: input => input.trim().length > 0 || 'App Password is required',
-        },
-      ]);
+    const { user, token } = await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'user',
+        message: 'Enter your Bitbucket username:',
+        validate: input => input.trim().length > 0 || 'Username is required',
+      },
+      {
+        type: 'password',
+        name: 'token',
+        message: 'Enter your Bitbucket App Password:',
+        validate: input => input.trim().length > 0 || 'App Password is required',
+      },
+    ]);
 
-      this.config.bitbucketUser = user.trim();
-      this.config.bitbucketToken = token;
-    } else {
-      const { user, password } = await inquirer.prompt([
-        {
-          type: 'input',
-          name: 'user',
-          message: 'Enter your Bitbucket username:',
-          validate: input => input.trim().length > 0 || 'Username is required',
-        },
-        {
-          type: 'password',
-          name: 'password',
-          message: 'Enter your Bitbucket password:',
-          validate: input => input.trim().length > 0 || 'Password is required',
-        },
-      ]);
-
-      this.config.bitbucketUser = user;
-      this.config.bitbucketPassword = password;
-      this.config.bitbucketToken = ''; // Clear token if using credentials
-    }
+    this.config.bitbucketUser = user.trim();
+    this.config.bitbucketToken = token;
 
     const { workspace } = await inquirer.prompt([
       {

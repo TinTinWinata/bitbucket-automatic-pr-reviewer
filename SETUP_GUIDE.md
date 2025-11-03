@@ -15,7 +15,7 @@ npm run setup
 The wizard will guide you through:
 - ✅ Prerequisites checking (Node.js, Docker, Claude CLI)
 - 🤖 Claude authentication setup (session, API key, or GLM models)
-- 🔧 Bitbucket configuration (credentials and workspace)
+- 🔧 Bitbucket configuration (token, username, and workspace)
 - ⚙️ Server settings (port, webhooks, event filtering)
 - 🐳 Docker services setup
 - 📝 Configuration file generation
@@ -45,14 +45,10 @@ If you prefer manual setup, follow the [original README instructions](./README.m
 
 ### 🔗 Bitbucket Configuration
 
-**App Password Method (Recommended):**
+**App Password Method:**
 1. Go to Bitbucket → Personal Settings → App passwords
 2. Create password with "Repositories: Read" and "Pull requests: Read" permissions
-3. Use this in the setup wizard
-
-**Username + Password Method:**
-- Traditional authentication
-- Less secure than app passwords
+3. Use your username and the generated app password in the setup wizard
 
 ### ⚙️ Server Configuration
 
