@@ -37,9 +37,6 @@ class ConfigGenerator {
       if (config.bitbucketUser) {
         envContent += `BITBUCKET_USER=${config.bitbucketUser}\n`;
       }
-      if (config.bitbucketPassword) {
-        envContent += `BITBUCKET_PASSWORD=${config.bitbucketPassword}\n`;
-      }
       envContent += '\n';
 
       // Webhook Security
@@ -143,7 +140,6 @@ class ConfigGenerator {
     console.log(`  Workspace: ${config.workspace || 'xriopteam'}`);
     console.log(`  User: ${config.bitbucketUser || 'Not set'}`);
     console.log(`  Token: ${config.bitbucketToken ? '✓ Set' : '✗ Not set'}`);
-    console.log(`  Password: ${config.bitbucketPassword ? '✓ Set' : '✗ Not set'}`);
 
     console.log(chalk.yellow('\nServer Configuration:'));
     console.log(`  Port: ${config.port || 3000}`);
@@ -172,8 +168,8 @@ class ConfigGenerator {
     }
 
     // Validate Bitbucket configuration
-    if (!config.bitbucketToken && (!config.bitbucketUser || !config.bitbucketPassword)) {
-      errors.push('Either Bitbucket token or username+password is required');
+    if (!config.bitbucketToken || !config.bitbucketUser) {
+      errors.push('Bitbucket token and username are required');
     }
 
     if (!config.workspace) {
