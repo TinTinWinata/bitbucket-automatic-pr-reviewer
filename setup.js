@@ -132,7 +132,7 @@ class SetupWizard {
               value: 'new_api',
             },
             {
-              name: '🤖 Set up GLM model authentication',
+              name: '🤖 Set up GLM model (via Z.ai)',
               value: 'new_glm',
             },
             {
@@ -208,7 +208,7 @@ class SetupWizard {
             value: 'api',
           },
           {
-            name: '🤖 GLM Model (use Chinese AI model)',
+            name: '🤖 GLM Model (via Z.ai)',
             value: 'glm',
           },
         ],

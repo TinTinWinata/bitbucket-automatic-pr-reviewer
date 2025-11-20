@@ -105,20 +105,36 @@ class ClaudeAuthHandler {
     try {
       await fs.ensureDir(this.claudeConfigDir);
 
-      const glmConfig = {
+      const claudeDir = path.join(this.claudeConfigDir, '.claude');
+      await fs.ensureDir(claudeDir);
+
+      const settingsConfig = {
+        env: {
+          ANTHROPIC_AUTH_TOKEN: apiKey,
+          ANTHROPIC_BASE_URL: 'https://api.z.ai/api/anthropic',
+        },
+      };
+
+      const settingsPath = path.join(claudeDir, 'settings.json');
+      await fs.writeJSON(settingsPath, settingsConfig, { spaces: 2 });
+
+      const configPath = path.join(this.claudeConfigDir, '.claude.json');
+      let claudeConfig = {};
+      if (await fs.pathExists(configPath)) {
+        claudeConfig = await fs.readJSON(configPath);
+      }
+
+      claudeConfig = {
+        ...claudeConfig,
         provider: 'glm',
-        apiKey: apiKey,
-        model: model,
-        baseURL: 'https://open.bigmodel.cn/api/paas/v4/',
         dangerouslySkipPermissions: true,
       };
 
-      const configPath = path.join(this.claudeConfigDir, '.claude.json');
-      await fs.writeJSON(configPath, glmConfig, { spaces: 2 });
+      delete claudeConfig.apiKey;
+      delete claudeConfig.model;
+      delete claudeConfig.baseURL;
 
-      // Create empty .claude directory
-      const claudeDir = path.join(this.claudeConfigDir, '.claude');
-      await fs.ensureDir(claudeDir);
+      await fs.writeJSON(configPath, claudeConfig, { spaces: 2 });
 
       console.log(chalk.green(`✓ Generated GLM configuration for model: ${model}`));
       return true;
@@ -199,11 +215,11 @@ This method uses API calls instead of your browser session.
 `),
       glm: chalk.blue(`
 GLM Model Authentication Instructions:
-1. Get your API key from: https://open.bigmodel.cn/
-2. Sign up for a GLM (智谱AI) account
-3. We'll generate the configuration for GLM models
+1. Get your API key from: https://z.ai/model-api
+2. Register or Login to Z.AI Open Platform
+3. We'll generate the configuration for GLM models (via Z.ai)
 
-This method uses GLM models instead of Claude.
+This method uses Z.ai's GLM models compatible with Claude Code.
 `),
     };
 
