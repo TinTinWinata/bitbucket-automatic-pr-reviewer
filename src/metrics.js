@@ -146,7 +146,6 @@ if (persistenceEnabled) {
     try {
       const metricsData = await persistence.extractMetricsData(register);
       persistence.save(metricsData);
-      logger.debug('Metrics saved to persistence storage');
     } catch (error) {
       logger.error(`Failed to save metrics: ${error.message}`);
     }
