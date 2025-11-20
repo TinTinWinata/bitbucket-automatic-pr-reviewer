@@ -80,6 +80,15 @@ This implementation uses **Claude CLI** instead of the Anthropic API:
 | Automation | Uses `--dangerously-skip-permissions` | Direct API calls |
 | Cost | Free (uses Claude CLI session) | Pay per token |
 
+### Z.ai / GLM Support
+
+You can also use Z.ai's GLM models (compatible with Claude Code) instead of Anthropic's models.
+
+1. **Setup**: Run `npm run setup` and choose "GLM Model".
+2. **Manual Configuration**:
+   - Get API key from [Z.ai Model API](https://z.ai/model-api).
+   - Set `ANTHROPIC_AUTH_TOKEN` (your Z.ai key) and `ANTHROPIC_BASE_URL=https://api.z.ai/api/anthropic` in your environment or `.claude/settings.json`.
+
 ### Project Structure
 
 ```
@@ -281,7 +290,7 @@ The system automatically handles git operations:
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `CLAUDE_MODEL` | No | `sonnet` | Claude model: `haiku`, `sonnet`, or `opus` |
+| `CLAUDE_MODEL` | No | `sonnet` | Claude model: `haiku`, `sonnet`, `opus` or GLM models (e.g., `glm-4.6`) |
 | `BITBUCKET_TOKEN` | Yes | - | Bitbucket App Password or Token |
 | `BITBUCKET_USER` | Yes | - | Bitbucket username |
 | `BITBUCKET_WEBHOOK_SECRET` | Recommended | - | Webhook signature validation secret |
