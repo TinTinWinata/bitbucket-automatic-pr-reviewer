@@ -50,7 +50,14 @@ class ConfigGenerator {
       envContent += '# Event Filtering\n';
       envContent += `# Set to 'true' to only process PR creation events (ignore updates)\n`;
       envContent += `# Set to 'false' to process all PR events (created + updated)\n`;
-      envContent += `PROCESS_ONLY_CREATED=${config.processOnlyCreated ? 'true' : 'false'}\n\n`;
+      envContent += `PROCESS_ONLY_CREATED=${config.processOnlyCreated ? 'true' : 'false'}\n`;
+
+      // User Filtering
+      if (config.allowedUsers) {
+        envContent += `# Only review PRs from these users (comma-separated display names)\n`;
+        envContent += `ALLOWED_USERS=${config.allowedUsers}\n`;
+      }
+      envContent += '\n';
 
       // Logging Configuration
       envContent += '# Logging Configuration\n';
@@ -153,6 +160,7 @@ class ConfigGenerator {
     console.log(chalk.yellow('\nServer Configuration:'));
     console.log(`  Port: ${config.port || 3000}`);
     console.log(`  Process Only Created: ${config.processOnlyCreated ? 'Yes' : 'No'}`);
+    console.log(`  Allowed Users: ${config.allowedUsers || 'All users'}`);
     console.log(`  Webhook Secret: ${config.webhookSecret ? '✓ Set' : '✗ Not set'}`);
 
     console.log(chalk.yellow('\nMetrics Persistence Configuration:'));
