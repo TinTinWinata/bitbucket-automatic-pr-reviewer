@@ -114,35 +114,37 @@ initializeMetrics();
 
 // Load persisted metrics if persistence is enabled
 if (persistenceEnabled) {
-  try {
-    const metricsData = persistence.load();
-    if (
-      Object.keys(metricsData.counters).length > 0 ||
-      Object.keys(metricsData.histograms).length > 0
-    ) {
-      persistence.restoreMetrics(register, metricsData, {
-        prCreatedCounter,
-        prUpdatedCounter,
-        claudeLgtmCounter,
-        claudeIssuesCounter,
-        claudeReviewSuccessCounter,
-        claudeReviewFailureCounter,
-        claudeReviewDurationHistogram,
-      });
-      logger.info('✅ Loaded persisted metrics from storage');
+  (async () => {
+    try {
+      const metricsData = persistence.load();
+      if (
+        Object.keys(metricsData.counters).length > 0 ||
+        Object.keys(metricsData.histograms).length > 0
+      ) {
+        await persistence.restoreMetrics(register, metricsData, {
+          prCreatedCounter,
+          prUpdatedCounter,
+          claudeLgtmCounter,
+          claudeIssuesCounter,
+          claudeReviewSuccessCounter,
+          claudeReviewFailureCounter,
+          claudeReviewDurationHistogram,
+        });
+        logger.info('✅ Loaded persisted metrics from storage');
+      }
+    } catch (error) {
+      logger.error(`Failed to load persisted metrics: ${error.message}`);
     }
-  } catch (error) {
-    logger.error(`Failed to load persisted metrics: ${error.message}`);
-  }
+  })();
 }
 
 // Periodically save metrics (every 30 seconds)
 let saveInterval = null;
 if (persistenceEnabled) {
   const saveIntervalMs = parseInt(process.env.METRICS_PERSISTENCE_SAVE_INTERVAL_MS || '30000');
-  saveInterval = setInterval(() => {
+  saveInterval = setInterval(async () => {
     try {
-      const metricsData = persistence.extractMetricsData(register);
+      const metricsData = await persistence.extractMetricsData(register);
       persistence.save(metricsData);
       logger.debug('Metrics saved to persistence storage');
     } catch (error) {
@@ -151,19 +153,20 @@ if (persistenceEnabled) {
   }, saveIntervalMs);
 
   // Save metrics on process exit
-  const saveMetricsOnShutdown = () => {
+  const saveMetricsOnShutdown = async () => {
     if (saveInterval) {
       clearInterval(saveInterval);
       saveInterval = null;
     }
     try {
-      const metricsData = persistence.extractMetricsData(register);
+      const metricsData = await persistence.extractMetricsData(register);
       persistence.save(metricsData);
       persistence.close();
       logger.info('Metrics saved before shutdown');
     } catch (error) {
       logger.error(`Failed to save metrics on shutdown: ${error.message}`);
     }
+    process.exit(0);
   };
 
   process.on('SIGTERM', saveMetricsOnShutdown);
