@@ -20,6 +20,7 @@ const claudeCircuitBreaker = new CircuitBreaker(failureThreshold, resetTimeout);
 // Security Configuration
 const BITBUCKET_WEBHOOK_SECRET = process.env.BITBUCKET_WEBHOOK_SECRET;
 const ALLOWED_WORKSPACE = process.env.ALLOWED_WORKSPACE || 'xriopteam'; // Default to xriopteam
+const ALLOWED_USERS = process.env.ALLOWED_USERS; // Comma-separated list of allowed display names
 
 // Event Filtering Configuration
 // Set to 'true' to only process PR creation events (ignore updates)
@@ -178,6 +179,24 @@ app.post('/webhook/bitbucket/pr', validateBitbucketWebhook, async (req, res) => 
     logger.info(`Event: ${req.headers['x-event-key']}`);
 
     const eventKey = req.headers['x-event-key'];
+
+    // User Filtering Logic
+    const authorDisplayName = payload.pullrequest.author.display_name;
+    logger.info(`👤 PR Author: ${authorDisplayName}`);
+
+    if (ALLOWED_USERS) {
+      const allowedUsersList = ALLOWED_USERS.split(',')
+        .map(u => u.trim())
+        .filter(Boolean);
+
+      if (allowedUsersList.length > 0 && !allowedUsersList.includes(authorDisplayName)) {
+        logger.info(`⏭️  Skipping PR from user "${authorDisplayName}" (not in ALLOWED_USERS)`);
+        return res.status(200).json({
+          message: `Skipping PR from user "${authorDisplayName}"`,
+          author: authorDisplayName,
+        });
+      }
+    }
 
     if (PROCESS_ONLY_CREATED && eventKey !== 'pullrequest:created') {
       logger.info(`⏭️  Event ignored (only processing PR creation): ${eventKey}`);
