@@ -251,12 +251,12 @@ class MetricsPersistence {
    * @param {Object} register - Prometheus registry
    * @returns {Object} Extracted metrics data
    */
-  extractMetricsData(register) {
+  async extractMetricsData(register) {
     const counters = {};
     const histograms = {};
 
     // Get all metrics from registry
-    const metrics = register.getMetricsAsJSON();
+    const metrics = await register.getMetricsAsJSON();
 
     // Ensure metrics is an iterable array
     if (!metrics || !Array.isArray(metrics)) {
@@ -304,7 +304,7 @@ class MetricsPersistence {
    * @param {Object} metricsData - Loaded metrics data
    * @param {Object} metricObjects - Metric objects from metrics.js
    */
-  restoreMetrics(register, metricsData, metricObjects) {
+  async restoreMetrics(register, metricsData, metricObjects) {
     // Restore counter metrics
     for (const key in metricsData.counters) {
       const metric = metricsData.counters[key];
@@ -312,7 +312,7 @@ class MetricsPersistence {
 
       if (metricObj && typeof metricObj.inc === 'function') {
         // Get current value
-        const currentValue = this.getCurrentMetricValue(register, metric.name, metric.labels);
+        const currentValue = await this.getCurrentMetricValue(register, metric.name, metric.labels);
         // Increment by the difference (or set if 0)
         const difference = metric.value - currentValue;
         if (difference > 0) {
@@ -346,9 +346,9 @@ class MetricsPersistence {
   /**
    * Get current metric value from registry
    */
-  getCurrentMetricValue(register, name, labels) {
+  async getCurrentMetricValue(register, name, labels) {
     try {
-      const metrics = register.getMetricsAsJSON();
+      const metrics = await register.getMetricsAsJSON();
       if (!metrics || !Array.isArray(metrics)) {
         return 0;
       }
