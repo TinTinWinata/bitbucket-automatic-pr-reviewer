@@ -27,7 +27,10 @@ class ConfigGenerator {
       } else {
         envContent += `CLAUDE_MODEL=${config.claudeModel || 'sonnet'}\n`;
       }
-      envContent += `CLAUDE_TIMEOUT_CONFIG=${config.claudeTimeout || 10}\n\n`;
+      envContent += `CLAUDE_TIMEOUT_CONFIG=${config.claudeTimeout || 10}\n`;
+      envContent += '# Maximum diff size in KB to include directly in prompt (default: 100KB)\n';
+      envContent += '# If diff exceeds this, merge-base instructions will be added instead\n';
+      envContent += `MAX_DIFF_SIZE_KB=${config.maxDiffSizeKB || 100}\n\n`;
 
       // Bitbucket Configuration
       envContent += '# Bitbucket Configuration\n';
