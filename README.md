@@ -291,6 +291,8 @@ The system automatically handles git operations:
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `CLAUDE_MODEL` | No | `sonnet` | Claude model: `haiku`, `sonnet`, `opus` or GLM models (e.g., `glm-4.6`) |
+| `CLAUDE_TIMEOUT_CONFIG` | No | `10` | Claude analysis timeout in minutes |
+| `MAX_DIFF_SIZE_KB` | No | `200` | Maximum diff size in KB to include directly in prompt. If diff exceeds this, merge-base instructions will be added instead. Recommended: 50KB (conservative), 200KB (default), 400KB (aggressive) |
 | `BITBUCKET_TOKEN` | Yes | - | Bitbucket App Password or Token |
 | `BITBUCKET_USER` | Yes | - | Bitbucket username |
 | `BITBUCKET_WEBHOOK_SECRET` | Recommended | - | Webhook signature validation secret |
