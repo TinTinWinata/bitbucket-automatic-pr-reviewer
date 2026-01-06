@@ -97,6 +97,58 @@ async function updateRepository(projectName, branch) {
 }
 
 /**
+ * Get diff between source and destination branch using merge-base
+ * This ensures we only get changes from the PR author, not changes merged into destination
+ * @param {string} projectPath - Path to the project repository
+ * @param {string} sourceBranch - Source branch name
+ * @param {string} destinationBranch - Destination branch name
+ * @returns {Promise<Object>} - Result with diff content and size in bytes
+ */
+async function getDiffFromMergeBase(projectPath, sourceBranch, destinationBranch) {
+  try {
+    logger.info(`Getting diff from merge-base for ${sourceBranch} -> ${destinationBranch}`);
+
+    // Ensure we have latest refs for both branches
+    await execAsync(`git -C "${projectPath}" fetch origin ${sourceBranch} ${destinationBranch}`, {
+      maxBuffer: 1024 * 1024 * 10, // 10MB buffer
+    });
+
+    // Find the merge base (common ancestor)
+    let mergeBase;
+    try {
+      const { stdout } = await execAsync(
+        `git -C "${projectPath}" merge-base origin/${destinationBranch} origin/${sourceBranch}`,
+      );
+      mergeBase = stdout.trim();
+      logger.debug(`Merge base found: ${mergeBase}`);
+    } catch (error) {
+      // If merge-base fails (e.g., branches have no common ancestor), fall back to destination branch
+      logger.warn(`Could not find merge-base, using destination branch as base: ${error.message}`);
+      mergeBase = `origin/${destinationBranch}`;
+    }
+
+    // Get diff from merge-base to source branch (only PR author's changes)
+    const { stdout: diff } = await execAsync(
+      `git -C "${projectPath}" diff ${mergeBase}..origin/${sourceBranch}`,
+      { maxBuffer: 1024 * 1024 * 50 }, // 50MB buffer for large diffs
+    );
+
+    const diffSize = Buffer.byteLength(diff, 'utf8');
+    logger.info(`Diff size: ${(diffSize / 1024).toFixed(2)} KB`);
+
+    return {
+      success: true,
+      diff,
+      size: diffSize,
+      mergeBase,
+    };
+  } catch (error) {
+    logger.error(`Error getting diff from merge-base: ${error.message}`);
+    throw new Error(`Failed to get diff from merge-base: ${error.message}`);
+  }
+}
+
+/**
  * Ensure project exists, clone if necessary
  * @param {Object} repoData - Repository data from webhook
  * @returns {Promise<Object>} - Result with success status and path
@@ -118,10 +170,16 @@ async function ensureProjectExists(repoData) {
     logger.info(`Project ${projectName} already exists`);
 
     try {
-      await updateRepository(projectName, repoData.sourceBranch);
+      // Fetch all branches to ensure we have latest refs
+      const projectPath = path.join(PROJECTS_DIR, projectName);
+      await execAsync(`git -C "${projectPath}" fetch --all`);
+
+      // Reset to source branch
+      await execAsync(`git -C "${projectPath}" reset --hard origin/${repoData.sourceBranch}`);
+
       return {
         success: true,
-        path: path.join(PROJECTS_DIR, projectName),
+        path: projectPath,
         wasCloned: false,
         message: 'Project exists and updated',
       };
@@ -149,4 +207,5 @@ module.exports = {
   cloneRepository,
   updateRepository,
   ensureProjectExists,
+  getDiffFromMergeBase,
 };

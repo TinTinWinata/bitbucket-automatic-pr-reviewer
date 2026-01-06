@@ -1,9 +1,12 @@
 const fs = require('fs');
 const path = require('path');
-const { ensureProjectExists } = require('./git');
+const { ensureProjectExists, getDiffFromMergeBase } = require('./git');
 const { metrics } = require('./metrics');
 const TemplateManager = require('./template-manager');
 const logger = require('./logger').default;
+
+const MAX_DIFF_SIZE_KB = parseInt(process.env.MAX_DIFF_SIZE_KB) || 200; // 200KB
+const MAX_DIFF_SIZE = MAX_DIFF_SIZE_KB * 1024; // Convert KB to bytes
 
 /**
  * Process pull request with Claude
@@ -37,11 +40,45 @@ async function processPullRequest(prData) {
     logger.info(`Project path: ${projectResult.path}`);
     logger.info(`Was cloned: ${projectResult.wasCloned ? 'Yes' : 'No (already existed)'}`);
 
-    // STEP 2: Process with Claude CLI
-    logger.info('=== Step 2: Processing with Claude CLI ===');
+    // STEP 2: Get diff from merge-base (only PR author's changes)
+    logger.info('=== Step 2: Getting PR Diff from Merge-Base ===');
+    let diffResult = null;
+    let diffTooLarge = false;
+
+    try {
+      diffResult = await getDiffFromMergeBase(
+        projectResult.path,
+        prData.sourceBranch,
+        prData.destinationBranch,
+      );
+
+      if (diffResult.success) {
+        diffTooLarge = diffResult.size > MAX_DIFF_SIZE;
+        const diffSizeKB = (diffResult.size / 1024).toFixed(2);
+        const estimatedTokens = Math.round(diffResult.size / 4); // Rough estimate: 1 token ≈ 4 chars
+
+        logger.info(
+          `Diff retrieved: ${diffSizeKB} KB (~${estimatedTokens.toLocaleString()} tokens, limit: ${MAX_DIFF_SIZE_KB}KB)`,
+        );
+        logger.info(
+          `Diff handling: ${diffTooLarge ? 'too large, will use merge-base instructions' : 'will include directly in prompt'}`,
+        );
+      }
+    } catch (error) {
+      logger.warn(`Failed to get diff from merge-base: ${error.message}. Will rely on MCP tools.`);
+      // Continue without diff - Claude will use MCP tools
+    }
+
+    // STEP 3: Process with Claude CLI
+    logger.info('=== Step 3: Processing with Claude CLI ===');
 
     const templateManager = new TemplateManager();
-    const prompt = templateManager.getPromptForPR(prData);
+    const prompt = templateManager.getPromptForPR(prData, {
+      diff: diffResult && !diffTooLarge ? diffResult.diff : null,
+      diffTooLarge: diffTooLarge,
+      sourceBranch: prData.sourceBranch,
+      destinationBranch: prData.destinationBranch,
+    });
 
     // Write prompt to temporary file
     const promptFile = path.join('/tmp', `pr-review-${Date.now()}.txt`);

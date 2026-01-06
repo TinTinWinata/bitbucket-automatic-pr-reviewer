@@ -456,17 +456,17 @@ To create a Bitbucket App Password:
 
     this.config.processOnlyCreated = processOnlyCreated;
 
-    const { allowedUsers } = await inquirer.prompt([
+    const { nonAllowedUsers } = await inquirer.prompt([
       {
         type: 'input',
-        name: 'allowedUsers',
+        name: 'nonAllowedUsers',
         message:
-          'Restrict reviews to specific users? (Comma-separated display names, leave empty for all)',
+          'Skip reviews for specific users? (Comma-separated display names, leave empty to review all)',
         default: '',
       },
     ]);
 
-    this.config.allowedUsers = allowedUsers.trim();
+    this.config.nonAllowedUsers = nonAllowedUsers.trim();
 
     const { useWebhookSecret } = await inquirer.prompt([
       {

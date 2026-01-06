@@ -141,9 +141,14 @@ class TemplateManager {
   /**
    * Get prompt for PR review
    * @param {Object} prData - Pull request data
+   * @param {Object} options - Additional options
+   * @param {string|null} options.diff - Diff content to include (if small enough)
+   * @param {boolean} options.diffTooLarge - Whether diff is too large to include
+   * @param {string} options.sourceBranch - Source branch name
+   * @param {string} options.destinationBranch - Destination branch name
    * @return {string} Processed prompt ready for Claude
    */
-  getPromptForPR(prData) {
+  getPromptForPR(prData, options = {}) {
     const templateName = this.getTemplateForRepository(prData.repository);
     const template = this.loadTemplate(templateName);
 
@@ -171,7 +176,55 @@ class TemplateManager {
       repoCloneUrl: prData.repoCloneUrl || '',
     };
 
-    return this.substituteVariables(template, variables);
+    let prompt = this.substituteVariables(template, variables);
+
+    // Add diff or instructions based on size
+    if (options.diff && !options.diffTooLarge) {
+      // Include diff directly in prompt
+      prompt += '\n\n---\n\n## PR Changes (from merge-base)\n\n';
+      prompt +=
+        'The following diff shows ONLY the changes made by the PR author, calculated from the merge-base:\n\n';
+      prompt += '```diff\n';
+      prompt += options.diff;
+      prompt += '\n```\n';
+      logger.info('Included diff directly in prompt');
+    } else if (options.diffTooLarge) {
+      // Add instructions for large diffs
+      const mergeBaseInstructions = `
+
+---
+
+## ⚠️ IMPORTANT: Reviewing Large PR Changes
+
+This PR contains a large number of changes. When fetching the diff using Bitbucket MCP tools, you **MUST** ensure you only review changes made by the PR author, not changes from other commits that may have been merged into the destination branch after this PR was created.
+
+### Critical Instructions:
+
+1. **Use Merge-Base Comparison**: When getting the diff, use the merge-base approach to isolate only the PR author's changes:
+   - Find the common ancestor (merge-base) between \`${options.sourceBranch}\` and \`${options.destinationBranch}\`
+   - Compare only from merge-base to the source branch: \`merge-base..${options.sourceBranch}\`
+   - Do NOT compare branch tips directly: \`${options.destinationBranch}..${options.sourceBranch}\` (this would include unrelated changes)
+
+2. **Use PR Diff Endpoint**: If available, use the Bitbucket PR's diff endpoint which should already compute the correct diff based on merge-base, rather than doing a branch-to-branch comparison.
+
+3. **What to Review**: Only review changes that are part of this PR. Ignore any changes that were merged into the destination branch after this PR was created.
+
+### Example Git Command (if using terminal):
+\`\`\`bash
+# Find merge-base
+MERGE_BASE=$(git merge-base origin/${options.destinationBranch} origin/${options.sourceBranch})
+
+# Get only PR author's changes
+git diff $MERGE_BASE..origin/${options.sourceBranch}
+\`\`\`
+
+**Remember**: The goal is to review ONLY the changes introduced by this PR, not changes from other contributors that may have been merged into the destination branch.
+`;
+      prompt += mergeBaseInstructions;
+      logger.info('Added merge-base instructions for large diff');
+    }
+
+    return prompt;
   }
 }
 
