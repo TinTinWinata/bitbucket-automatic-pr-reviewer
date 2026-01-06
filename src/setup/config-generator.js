@@ -53,9 +53,9 @@ class ConfigGenerator {
       envContent += `PROCESS_ONLY_CREATED=${config.processOnlyCreated ? 'true' : 'false'}\n`;
 
       // User Filtering
-      if (config.allowedUsers) {
-        envContent += `# Only review PRs from these users (comma-separated display names)\n`;
-        envContent += `ALLOWED_USERS=${config.allowedUsers}\n`;
+      if (config.nonAllowedUsers) {
+        envContent += `# Skip reviews for these users (comma-separated display names)\n`;
+        envContent += `NON_ALLOWED_USERS=${config.nonAllowedUsers}\n`;
       }
       envContent += '\n';
 
@@ -160,7 +160,7 @@ class ConfigGenerator {
     console.log(chalk.yellow('\nServer Configuration:'));
     console.log(`  Port: ${config.port || 3000}`);
     console.log(`  Process Only Created: ${config.processOnlyCreated ? 'Yes' : 'No'}`);
-    console.log(`  Allowed Users: ${config.allowedUsers || 'All users'}`);
+    console.log(`  Non-Allowed Users: ${config.nonAllowedUsers || 'None (all users allowed)'}`);
     console.log(`  Webhook Secret: ${config.webhookSecret ? '✓ Set' : '✗ Not set'}`);
 
     console.log(chalk.yellow('\nMetrics Persistence Configuration:'));
