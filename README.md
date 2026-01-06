@@ -295,7 +295,7 @@ The system automatically handles git operations:
 | `BITBUCKET_USER` | Yes | - | Bitbucket username |
 | `BITBUCKET_WEBHOOK_SECRET` | Recommended | - | Webhook signature validation secret |
 | `ALLOWED_WORKSPACE` | No | `xriopteam` | Bitbucket workspace/organization slug to accept webhooks from |
-| `ALLOWED_USERS` | No | - | Comma-separated list of Bitbucket display names to review (e.g. "John Doe, Jane Smith"). If empty, reviews everyone. |
+| `NON_ALLOWED_USERS` | No | - | Comma-separated list of Bitbucket display names to skip (e.g. "John Doe, Jane Smith"). If empty, reviews everyone. |
 | `PROCESS_ONLY_CREATED` | No | `false` | Set to `true` to only process PR creation events (ignore updates) |
 | `PORT` | No | `3000` | Server port |
 | `METRICS_PERSISTENCE_ENABLED` | No | `false` | Enable metrics persistence to survive restarts/rebuilds |
