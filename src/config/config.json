@@ -1,0 +1,14 @@
+{
+  "defaultTemplate": "default",
+  "repositories": {},
+  "prReview": {
+    "enabled": true,
+    "targetBranchPatterns": [],
+    "sourceBranchPatterns": []
+  },
+  "releaseNote": {
+    "enabled": false,
+    "targetBranchPatterns": ["^release-"],
+    "sourceBranchPatterns": []
+  }
+}

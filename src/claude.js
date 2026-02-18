@@ -9,15 +9,114 @@ const MAX_DIFF_SIZE_KB = parseInt(process.env.MAX_DIFF_SIZE_KB) || 200; // 200KB
 const MAX_DIFF_SIZE = MAX_DIFF_SIZE_KB * 1024; // Convert KB to bytes
 
 /**
- * Process pull request with Claude
- * @param {Object} prData - Pull request data from Bitbucket webhook
+ * Normalize queue item or legacy prData to { prData, type }.
+ * @param {Object} queueItemOrPrData - Either { prData, type } or plain prData (legacy)
+ * @returns {{ prData: Object, type: string }}
  */
-async function processPullRequest(prData) {
+function normalizeQueueItem(queueItemOrPrData) {
+  if (queueItemOrPrData && queueItemOrPrData.type && queueItemOrPrData.prData) {
+    return { prData: queueItemOrPrData.prData, type: queueItemOrPrData.type };
+  }
+  return { prData: queueItemOrPrData, type: 'review' };
+}
+
+/**
+ * Run only the release-note flow: ensure repo, build prompt, run Claude, post comment via MCP.
+ * @param {Object} prData - Pull request data
+ * @returns {Promise<{ success: boolean }>}
+ */
+async function runReleaseNoteFlow(prData) {
+  logger.info('Running release note flow...');
+  logger.info(`PR Title: ${prData.title}`);
+
+  const repoData = {
+    name: prData.repository,
+    cloneUrl: prData.repoCloneUrl,
+    sourceBranch: prData.sourceBranch,
+  };
+  const projectResult = await ensureProjectExists(repoData);
+  if (!projectResult.success) {
+    throw new Error('Failed to ensure project exists');
+  }
+
+  const templateManager = new TemplateManager();
+  const prompt = templateManager.getReleaseNotePrompt(prData);
+  const promptFile = path.join('/tmp', `release-note-${Date.now()}.txt`);
+  fs.writeFileSync(promptFile, prompt);
+
+  const model = process.env.CLAUDE_MODEL || 'sonnet';
+  let timeoutMinutes = parseInt(process.env.CLAUDE_TIMEOUT_CONFIG, 10);
+  if (Number.isNaN(timeoutMinutes) || timeoutMinutes <= 0) timeoutMinutes = 10;
+
+  const env = {
+    ...process.env,
+    SHELL: '/bin/bash',
+    HOME: '/home/node',
+    PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+  };
+
+  const { spawn } = require('child_process');
+  const claudeProcess = spawn(
+    'claude',
+    ['--dangerously-skip-permissions', '--model', model, '--output-format', 'text'],
+    { cwd: projectResult.path, env, shell: false },
+  );
+
+  try {
+    const result = await new Promise((resolve, reject) => {
+      let stdout = '';
+      let stderr = '';
+      const timeoutMs = timeoutMinutes * 60 * 1000;
+      const timeout = setTimeout(() => {
+        claudeProcess.kill('SIGTERM');
+        reject(new Error(`Release note generation timed out after ${timeoutMinutes} minutes`));
+      }, timeoutMs);
+      claudeProcess.stdout.on('data', d => {
+        stdout += d.toString();
+        process.stdout.write(d);
+      });
+      claudeProcess.stderr.on('data', d => {
+        stderr += d.toString();
+        process.stderr.write(d);
+      });
+      claudeProcess.on('close', code => {
+        clearTimeout(timeout);
+        if (code === 0) resolve({ stdout, stderr });
+        else
+          reject(new Error(`Claude exited with code ${code}: ${stderr || stdout || 'No output'}`));
+      });
+      claudeProcess.on('error', reject);
+      claudeProcess.stdin.write(fs.readFileSync(promptFile, 'utf8'));
+      claudeProcess.stdin.end();
+    });
+    logger.info('✓ Release note Claude run completed');
+    return { success: true, response: result.stdout };
+  } finally {
+    if (fs.existsSync(promptFile)) fs.unlinkSync(promptFile);
+  }
+}
+
+/**
+ * Process pull request with Claude (review or create-release-note by queue item type).
+ * @param {Object} queueItemOrPrData - Either { prData, type: 'review'|'create-release-note' } or legacy prData
+ */
+async function processPullRequest(queueItemOrPrData) {
+  const { prData, type } = normalizeQueueItem(queueItemOrPrData);
   const repository = prData.repository;
   const startTime = Date.now();
 
+  if (type === 'create-release-note') {
+    try {
+      await runReleaseNoteFlow(prData);
+      return { success: true };
+    } catch (error) {
+      logger.error(`Release note flow failed: ${error.message}`);
+      throw error;
+    }
+  }
+
   try {
-    logger.info('Processing PR with Claude...');
+    logger.info('Processing PR with Claude (review)...');
     logger.info(`PR Title: ${prData.title}`);
     logger.info(`Author: ${prData.author}`);
     logger.info(`Repository: ${prData.repository}`);

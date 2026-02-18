@@ -95,11 +95,14 @@ You can also use Z.ai's GLM models (compatible with Claude Code) instead of Anth
 @pr-automation/
 ├── src/
 │   ├── index.js          # Express server and webhook handler
-│   ├── claude.js         # Claude CLI integration with validation
+│   ├── claude.js         # Claude CLI integration (review + release note)
 │   ├── git.js            # Git operations (clone, update, validate)
+│   ├── branch-matcher.js # Branch regex rules (prReview / releaseNote)
 │   ├── metrics.js        # Prometheus metrics collection
 │   ├── logger.js         # Logging configuration
-│   └── template-manager.js # Template management for PR reviews
+│   ├── template-manager.js # Template management for PR reviews
+│   └── config/
+│       └── config.json   # Templates + branch rules (prReview, releaseNote)
 ├── tests/                # Unit tests directory
 │   ├── claude.test.js    # Tests for Claude.js functionality
 │   ├── git.test.js       # Tests for Git operations
@@ -142,9 +145,12 @@ Receives Bitbucket pull request creation webhooks.
 ```json
 {
   "message": "Webhook received successfully",
-  "prTitle": "Add new feature"
+  "prTitle": "Add new feature",
+  "enqueued": ["review", "create-release-note"],
+  "queuePosition": 2
 }
 ```
+`enqueued` lists job types added to the queue (based on branch rules in `config.json`). One PR can enqueue both a review and a release-note job.
 
 ## Customizing PR Review Templates
 
@@ -175,15 +181,20 @@ touch src/templates/custom/my-review.md
 
 **3. Map repository to template:**
 
+Edit `src/config/config.json` (templates and branch rules):
+
 ```json
-// src/config/template-config.json
 {
   "defaultTemplate": "default",
   "repositories": {
     "payment-api": "my-review"
-  }
+  },
+  "prReview": { "enabled": true, "targetBranchPatterns": [], "sourceBranchPatterns": [] },
+  "releaseNote": { "enabled": false, "targetBranchPatterns": ["^release-"], "sourceBranchPatterns": [] }
 }
 ```
+Empty `prReview.targetBranchPatterns` = run review for all PRs. Set `releaseNote.enabled` and patterns to auto-generate release notes (e.g. when target branch matches `^release-`). See [TEMPLATE_GUIDE.md](TEMPLATE_GUIDE.md) for branch rules.
+
 **4. Restart service:**
 
 ```bash

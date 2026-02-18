@@ -9,7 +9,7 @@ const logger = require('./logger').default;
 class TemplateManager {
   constructor() {
     this.templatesDir = path.join(__dirname, 'templates');
-    this.configPath = path.join(__dirname, 'config', 'template-config.json');
+    this.configPath = path.join(__dirname, 'config', 'config.json');
     this.config = this.loadConfig();
   }
   /**
@@ -225,6 +225,31 @@ git diff $MERGE_BASE..origin/${options.sourceBranch}
     }
 
     return prompt;
+  }
+
+  /**
+   * Get prompt for release note generation (create-release-note job type).
+   * Uses default release-note template and substitutes PR variables.
+   * @param {Object} prData - Pull request data
+   * @returns {string} Processed prompt for Claude
+   */
+  getReleaseNotePrompt(prData) {
+    const releaseNotePath = path.join(this.templatesDir, 'default', 'release-note-prompt.md');
+    if (!fs.existsSync(releaseNotePath)) {
+      throw new Error(`Release note template not found: ${releaseNotePath}`);
+    }
+    const template = fs.readFileSync(releaseNotePath, 'utf-8');
+    const variables = {
+      prUrl: prData.prUrl || '',
+      title: prData.title || '',
+      description: prData.description || '',
+      author: prData.author || '',
+      sourceBranch: prData.sourceBranch || '',
+      destinationBranch: prData.destinationBranch || '',
+      repository: prData.repository || '',
+      repoCloneUrl: prData.repoCloneUrl || '',
+    };
+    return this.substituteVariables(template, variables);
   }
 }
 

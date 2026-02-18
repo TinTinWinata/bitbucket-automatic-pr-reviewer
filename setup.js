@@ -655,6 +655,9 @@ To create a Bitbucket App Password:
       console.log(chalk.yellow('⚠ Warning: Failed to update .claude.json with MCP servers'));
     }
 
+    // Create or migrate to src/config/config.json (templates + branch rules)
+    await this.configGenerator.createOrMigrateConfigJson();
+
     console.log(chalk.green('✓ Configuration files generated'));
   }
 

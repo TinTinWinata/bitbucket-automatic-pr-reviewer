@@ -77,6 +77,14 @@ Generated based on your chosen authentication method.
 ### `.mcp.json` - MCP Server Configuration
 Bitbucket integration settings.
 
+### `src/config/config.json` - App configuration (templates + branch rules)
+Created or migrated by the setup wizard. Contains:
+- **defaultTemplate** and **repositories**: which PR review template to use per repo.
+- **prReview**: when to enqueue a PR review job (empty target patterns = all PRs).
+- **releaseNote**: when to enqueue a release-note job (e.g. target branch `^release-`).
+
+Edit this file to customize branch rules or template mapping. Restart the service after changes.
+
 ### `docker-compose.yml` - Docker Configuration
 Service orchestration (created from example if needed).
 
