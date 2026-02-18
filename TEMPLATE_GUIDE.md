@@ -13,7 +13,7 @@ src/
 │       ├── quick-review.md                 # Example: Quick review
 │       └── security-focused.md             # Example: Security focused
 └── config/
-    └── template-config.json                # Repository → Template mapping
+    └── config.json                        # Templates + branch rules (prReview, releaseNote)
 ```
 
 ## Quick Start
@@ -61,14 +61,16 @@ Review REST API changes for {{repository}}.
 
 ### Step 3: Configure repository mapping
 
-Edit `src/config/template-config.json`
+Edit `src/config/config.json`
 
 ```json
 {
-   "defaultTemplate":"default",
-   "repositories":{
-      "backend-api":"api-review"
-   }
+   "defaultTemplate": "default",
+   "repositories": {
+      "backend-api": "api-review"
+   },
+   "prReview": { "enabled": true, "targetBranchPatterns": [], "sourceBranchPatterns": [] },
+   "releaseNote": { "enabled": false, "targetBranchPatterns": ["^release-"], "sourceBranchPatterns": [] }
 }
 ```
 **Configuration rules:**
@@ -175,13 +177,23 @@ After posting the PR comment, you must output a JSON block:
 
 ### Configuration file schema
 
-**File:** `src/config/template-config.json`
+**File:** `src/config/config.json`
+
+The file holds template mapping and branch rules. Two job types are enqueued per webhook based on branch regex: **review** (PR review) and **create-release-note** (release note comment).
 
 ```json
 {
   "defaultTemplate": "string",
-  "repositories": {
-    "string": "string"
+  "repositories": { "string": "string" },
+  "prReview": {
+    "enabled": true,
+    "targetBranchPatterns": [],
+    "sourceBranchPatterns": []
+  },
+  "releaseNote": {
+    "enabled": false,
+    "targetBranchPatterns": ["^release-"],
+    "sourceBranchPatterns": []
   }
 }
 ```
@@ -192,6 +204,14 @@ After posting the PR comment, you must output a JSON block:
 |-------|------|----------|-------------|
 | `defaultTemplate` | string | Yes | Template name for repositories without explicit mapping |
 | `repositories` | object | No | Map of repository name → template name |
+| `prReview` | object | No | When to enqueue a **review** job. Empty `targetBranchPatterns` = match all PRs (default). |
+| `prReview.enabled` | boolean | No | Default true. |
+| `prReview.targetBranchPatterns` | string[] | No | JavaScript regex for destination branch. Empty = run review for all. |
+| `prReview.sourceBranchPatterns` | string[] | No | Optional. If set, source branch must match one regex. |
+| `releaseNote` | object | No | When to enqueue a **create-release-note** job. |
+| `releaseNote.enabled` | boolean | No | Default false. Set true to enable. |
+| `releaseNote.targetBranchPatterns` | string[] | No | e.g. `["^release-"]` to run when target is `release-*`. |
+| `releaseNote.sourceBranchPatterns` | string[] | No | Optional. If set, source branch must match one regex. |
 
 ### Configuration Examples
 
@@ -211,7 +231,9 @@ After posting the PR comment, you must output a JSON block:
     "payment-api": "security-focused",
     "analytics-service": "performance-review",
     "ui-components": "quick-review"
-  }
+  },
+  "prReview": { "enabled": true, "targetBranchPatterns": [], "sourceBranchPatterns": [] },
+  "releaseNote": { "enabled": true, "targetBranchPatterns": ["^release-"], "sourceBranchPatterns": [] }
 }
 ```
 

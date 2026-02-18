@@ -217,6 +217,7 @@ class ConfigGenerator {
       path.join(this.projectRoot, 'projects'),
       path.join(this.projectRoot, 'claude-config'),
       path.join(this.projectRoot, 'metrics-storage'),
+      path.join(this.projectRoot, 'src', 'config'),
     ];
 
     for (const dir of directories) {
@@ -224,6 +225,77 @@ class ConfigGenerator {
     }
 
     console.log(chalk.green('✓ Created necessary directories'));
+  }
+
+  /**
+   * Default app config (templates + branch rules). Used when creating or migrating to config.json.
+   */
+  getDefaultAppConfig() {
+    return {
+      defaultTemplate: 'default',
+      repositories: {},
+      prReview: {
+        enabled: true,
+        targetBranchPatterns: [],
+        sourceBranchPatterns: [],
+      },
+      releaseNote: {
+        enabled: false,
+        targetBranchPatterns: ['^release-'],
+        sourceBranchPatterns: [],
+      },
+    };
+  }
+
+  /**
+   * Create or migrate to src/config/config.json. If template-config.json exists, merge it and add
+   * prReview/releaseNote; otherwise create default config.json.
+   */
+  async createOrMigrateConfigJson() {
+    const configDir = path.join(this.projectRoot, 'src', 'config');
+    const configPath = path.join(configDir, 'config.json');
+    const legacyPath = path.join(configDir, 'template-config.json');
+
+    await fs.ensureDir(configDir);
+
+    let config;
+    if (await fs.pathExists(legacyPath)) {
+      try {
+        const legacy = await fs.readJSON(legacyPath);
+        config = {
+          defaultTemplate: legacy.defaultTemplate ?? 'default',
+          repositories: legacy.repositories ?? {},
+          prReview: legacy.prReview ?? this.getDefaultAppConfig().prReview,
+          releaseNote: legacy.releaseNote ?? this.getDefaultAppConfig().releaseNote,
+        };
+        const backupPath = path.join(configDir, 'template-config.json.backup');
+        await fs.copy(legacyPath, backupPath);
+        console.log(
+          chalk.yellow(
+            '⚠ Migrated template-config.json to config.json (backup: template-config.json.backup)',
+          ),
+        );
+      } catch (err) {
+        console.error(chalk.red('✗ Failed to read template-config.json:'), err.message);
+        config = this.getDefaultAppConfig();
+      }
+    } else if (await fs.pathExists(configPath)) {
+      try {
+        config = await fs.readJSON(configPath);
+        const defaults = this.getDefaultAppConfig();
+        if (!config.prReview) config.prReview = defaults.prReview;
+        if (!config.releaseNote) config.releaseNote = defaults.releaseNote;
+      } catch (err) {
+        console.error(chalk.red('✗ Failed to read config.json:'), err.message);
+        config = this.getDefaultAppConfig();
+      }
+    } else {
+      config = this.getDefaultAppConfig();
+    }
+
+    await fs.writeJSON(configPath, config, { spaces: 2 });
+    console.log(chalk.green('✓ config.json ready (src/config/config.json)'));
+    return true;
   }
 
   /**

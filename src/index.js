@@ -6,6 +6,7 @@ const { register, metrics } = require('./metrics');
 const logger = require('./logger').default;
 const { BitbucketPayloadSchema } = require('./schemas');
 const CircuitBreaker = require('./circuit-breaker');
+const { shouldRunReview, shouldCreateReleaseNote } = require('./branch-matcher');
 
 dotenv.config();
 
@@ -40,19 +41,21 @@ async function processQueue() {
   }
 
   isProcessing = true;
-  const prData = reviewQueue.shift(); // Get first item from queue
+  const queueItem = reviewQueue.shift(); // { prData, type: 'review' | 'create-release-note' }
 
-  logger.info(`📋 Processing PR from queue: ${prData.title} (${reviewQueue.length} remaining)`);
+  logger.info(
+    `📋 Processing queue item: ${queueItem.prData.title} [${queueItem.type}] (${reviewQueue.length} remaining)`,
+  );
 
   try {
     if (!claudeCircuitBreaker.canAttempt()) {
-      logger.error('🚫 Circuit breaker is OPEN. Skipping PR review to avoid system overload.');
+      logger.error('🚫 Circuit breaker is OPEN. Skipping to avoid system overload.');
       return;
     }
 
-    await processPullRequest(prData);
+    await processPullRequest(queueItem);
 
-    logger.info('✅ Claude PR review succeeded');
+    logger.info(`✅ Claude ${queueItem.type} succeeded`);
     claudeCircuitBreaker.recordSuccess();
   } catch (error) {
     logger.error(`Error processing PR with Claude: ${error.message}`);
@@ -239,14 +242,33 @@ app.post('/webhook/bitbucket/pr', validateBitbucketWebhook, async (req, res) => 
       logger.debug(`Metrics: Incremented PR updated counter for ${repository}`);
     }
 
+    const enqueued = [];
+    if (shouldRunReview(prData)) {
+      reviewQueue.push({ prData, type: 'review' });
+      enqueued.push('review');
+    }
+    if (shouldCreateReleaseNote(prData)) {
+      reviewQueue.push({ prData, type: 'create-release-note' });
+      enqueued.push('create-release-note');
+    }
+
+    if (enqueued.length === 0) {
+      logger.info(
+        `⏭️  PR did not match any branch rules: ${prData.title} (source: ${prData.sourceBranch}, target: ${prData.destinationBranch})`,
+      );
+    } else {
+      logger.info(
+        `✅ PR enqueued: ${prData.title} [${enqueued.join(', ')}] (queue size: ${reviewQueue.length})`,
+      );
+    }
+
     res.status(200).json({
       message: 'Webhook received successfully',
       prTitle: prData.title,
-      queuePosition: reviewQueue.length + 1,
+      enqueued,
+      queuePosition: reviewQueue.length,
     });
 
-    reviewQueue.push(prData);
-    logger.info(`✅ PR added to queue: ${prData.title} (queue size: ${reviewQueue.length})`);
     processQueue();
   } catch (error) {
     logger.error(`Error handling webhook: ${error.message}`);
