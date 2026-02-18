@@ -1,8 +1,5 @@
-const fs = require('fs');
-const path = require('path');
 const logger = require('./logger').default;
-
-const CONFIG_PATH = path.join(__dirname, 'config', 'config.json');
+const { getConfig } = require('./config/loader');
 
 /**
  * Compile regex patterns and return an array of RegExp, or null if invalid/disabled.
@@ -33,16 +30,7 @@ function compilePatterns(patterns, ruleName) {
  * @returns {{ prReview: { target: RegExp[]|null, source: RegExp[]|null, enabled: boolean }, releaseNote: { target: RegExp[]|null, source: RegExp[]|null, enabled: boolean } }}
  */
 function loadRules() {
-  let config = {};
-  try {
-    if (fs.existsSync(CONFIG_PATH)) {
-      const data = fs.readFileSync(CONFIG_PATH, 'utf8');
-      config = JSON.parse(data);
-    }
-  } catch (err) {
-    logger.warn('Branch matcher: failed to load config, using defaults: ', err.message);
-  }
-
+  const config = getConfig();
   const prReview = config.prReview || {};
   const releaseNote = config.releaseNote || {};
 

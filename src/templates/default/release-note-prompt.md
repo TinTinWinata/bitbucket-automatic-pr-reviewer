@@ -19,7 +19,7 @@ Using the PR context and (if available) the changes in this repository, produce 
 
 1. Use Bitbucket MCP tools to fetch PR details and file diffs if needed.
 2. Summarize the changes in 1–3 bullet points suitable for a release note (user-facing, concise).
-3. Use Bitbucket MCP tools to post **one** PR comment containing the release note. Use a clear heading such as "## Release note" or "## Release Note" so it is recognizable.
+3. Use Bitbucket MCP tools to post PR comment containing the release note. Use a clear heading so it is recognizable.
 4. Do not run code review; only generate and post the release note.
 
 ---

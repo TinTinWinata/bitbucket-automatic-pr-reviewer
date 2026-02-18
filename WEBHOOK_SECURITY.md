@@ -5,7 +5,7 @@ This document explains how to secure your PR automation webhook endpoint with si
 ## Security Features
 
 ✅ **Webhook Signature Validation** - Verify requests are from Bitbucket using HMAC-SHA256  
-✅ **Workspace Restriction** - Only accept webhooks from authorized Bitbucket workspace (xriopteam)  
+✅ **Workspace Restriction** - Only accept webhooks from authorized Bitbucket workspace (yourworkspace)  
 ✅ **Sequential Processing** - Queue system prevents race conditions and branch conflicts  
 ✅ **Bitbucket MCP Integration** - Direct integration with Bitbucket for secure PR operations
 
@@ -44,7 +44,7 @@ Add the webhook secret to your `.env` file:
 ```env
 # Webhook Security
 BITBUCKET_WEBHOOK_SECRET=a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6
-ALLOWED_WORKSPACE=xriopteam
+ALLOWED_WORKSPACE=yourworkspace
 
 # Existing configuration...
 CLAUDE_MODEL=sonnet
@@ -81,7 +81,7 @@ docker compose logs -f pr-automation
 **Expected output:**
 ```
 ✅ Webhook signature verified
-✅ Workspace verified: xriopteam
+✅ Workspace verified: yourworkspace
 Received Bitbucket PR webhook
 ```
 
@@ -90,7 +90,7 @@ Received Bitbucket PR webhook
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `BITBUCKET_WEBHOOK_SECRET` | **Yes** | Secret key for webhook signature validation |
-| `ALLOWED_WORKSPACE` | No | Bitbucket workspace slug (default: `xriopteam`) |
+| `ALLOWED_WORKSPACE` | No | Bitbucket workspace slug (default: `yourworkspace`) |
 
 ## Current Implementation Features
 

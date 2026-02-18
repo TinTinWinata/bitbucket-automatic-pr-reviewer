@@ -1,6 +1,7 @@
 const client = require('prom-client');
 const MetricsPersistence = require('./metrics-persistence');
 const logger = require('./logger').default;
+const { getConfig } = require('./config/loader');
 
 // Create a Registry to register the metrics
 const register = new client.Registry();
@@ -8,10 +9,12 @@ const register = new client.Registry();
 // Add default metrics (memory, CPU, etc.)
 client.collectDefaultMetrics({ register });
 
-// Initialize metrics persistence
-const persistenceEnabled = process.env.METRICS_PERSISTENCE_ENABLED === 'true';
-const persistenceType = process.env.METRICS_PERSISTENCE_TYPE || 'filesystem';
-const persistencePath = process.env.METRICS_PERSISTENCE_PATH;
+// Initialize metrics persistence from config
+const metricsConfig = getConfig().metrics || {};
+const persistenceConfig = metricsConfig.persistence || {};
+const persistenceEnabled = persistenceConfig.enabled === true;
+const persistenceType = persistenceConfig.type || 'filesystem';
+const persistencePath = persistenceConfig.path;
 
 const persistence = new MetricsPersistence({
   enabled: persistenceEnabled,
@@ -138,10 +141,10 @@ if (persistenceEnabled) {
   })();
 }
 
-// Periodically save metrics (every 30 seconds)
+// Periodically save metrics
 let saveInterval = null;
 if (persistenceEnabled) {
-  const saveIntervalMs = parseInt(process.env.METRICS_PERSISTENCE_SAVE_INTERVAL_MS || '30000');
+  const saveIntervalMs = parseInt(persistenceConfig.saveIntervalMs, 10) || 30000;
   saveInterval = setInterval(async () => {
     try {
       const metricsData = await persistence.extractMetricsData(register);

@@ -7,7 +7,6 @@ module.exports = [
   prettierConfig,
   {
     files: ['**/*.js'],
-    ignores: ['src/logger.js'],
     languageOptions: {
       ecmaVersion: 2021,
       sourceType: 'script',

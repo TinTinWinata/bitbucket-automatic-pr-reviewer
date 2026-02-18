@@ -1,0 +1,52 @@
+{
+  "defaultTemplate": "default",
+  "repositories": {},
+  "prReview": {
+    "enabled": true,
+    "targetBranchPatterns": [],
+    "sourceBranchPatterns": []
+  },
+  "releaseNote": {
+    "enabled": false,
+    "targetBranchPatterns": ["^release-"],
+    "sourceBranchPatterns": []
+  },
+  "server": {
+    "port": 3000
+  },
+  "claude": {
+    "model": "sonnet",
+    "timeoutMinutes": 10,
+    "maxDiffSizeKb": 200
+  },
+  "bitbucket": {
+    "allowedWorkspace": "xriopteam",
+    "nonAllowedUsers": ""
+  },
+  "eventFilter": {
+    "processOnlyCreated": false
+  },
+  "metrics": {
+    "persistence": {
+      "enabled": false,
+      "type": "filesystem",
+      "path": "/app/metrics-storage",
+      "saveIntervalMs": 30000
+    }
+  },
+  "logging": {
+    "level": "info",
+    "fileRetentionDays": 30,
+    "maxFileSize": "20m",
+    "enableConsole": true,
+    "enableFile": true
+  },
+  "circuitBreaker": {
+    "failureThreshold": 3,
+    "resetTimeoutMs": 30000
+  },
+  "promptLogs": {
+    "enabled": false,
+    "path": "/app/prompt-logs"
+  }
+}

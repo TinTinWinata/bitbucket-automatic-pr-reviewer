@@ -419,7 +419,7 @@ To create a Bitbucket App Password:
         type: 'input',
         name: 'workspace',
         message: 'Enter your Bitbucket workspace name:',
-        default: 'xriopteam',
+        default: 'yourworkspace',
         validate: input => input.trim().length > 0 || 'Workspace is required',
       },
     ]);
@@ -505,102 +505,16 @@ To create a Bitbucket App Password:
       this.config.webhookSecret = '';
     }
 
-    // Metrics Persistence Configuration
-    const { enableMetricsPersistence } = await inquirer.prompt([
+    // Prompt logs: persist prompts sent to Claude (for debugging/audit)
+    const { promptLogsEnabled } = await inquirer.prompt([
       {
         type: 'confirm',
-        name: 'enableMetricsPersistence',
-        message: 'Enable metrics persistence (survives restarts/rebuilds)?',
+        name: 'promptLogsEnabled',
+        message: 'Enable prompt logs (persist prompts sent to Claude for debugging)?',
         default: false,
       },
     ]);
-
-    this.config.metricsPersistenceEnabled = enableMetricsPersistence;
-
-    if (enableMetricsPersistence) {
-      const isMacOS = process.platform === 'darwin';
-
-      if (isMacOS) {
-        // Automatically use filesystem on macOS
-        this.config.metricsPersistenceType = 'filesystem';
-        console.log(
-          chalk.yellow(
-            '⚠️  macOS detected: Using filesystem storage (SQLite has native binding issues on macOS)',
-          ),
-        );
-        console.log(
-          chalk.gray('   Linux servers support SQLite - you can enable it manually if needed.'),
-        );
-      } else {
-        // Show choice for Linux and other platforms
-        const { persistenceType } = await inquirer.prompt([
-          {
-            type: 'list',
-            name: 'persistenceType',
-            message: 'Choose metrics storage type:',
-            choices: [
-              {
-                name: '📁 Filesystem (JSON file - recommended)',
-                value: 'filesystem',
-              },
-              {
-                name: '🗄️  SQLite (Database - better for high volume)',
-                value: 'sqlite',
-              },
-            ],
-            default: 'filesystem',
-          },
-        ]);
-
-        this.config.metricsPersistenceType = persistenceType;
-      }
-
-      const { customPath } = await inquirer.prompt([
-        {
-          type: 'confirm',
-          name: 'customPath',
-          message: 'Use custom storage path?',
-          default: false,
-        },
-      ]);
-
-      if (customPath) {
-        const { persistencePath } = await inquirer.prompt([
-          {
-            type: 'input',
-            name: 'persistencePath',
-            message: 'Enter metrics storage path:',
-            default: './metrics-storage',
-            validate: input => input.trim().length > 0 || 'Storage path is required',
-          },
-        ]);
-        this.config.metricsPersistencePath = persistencePath.trim();
-      } else {
-        this.config.metricsPersistencePath = './metrics-storage';
-      }
-
-      const { customInterval } = await inquirer.prompt([
-        {
-          type: 'confirm',
-          name: 'customInterval',
-          message: 'Use custom save interval (default: 30 seconds)?',
-          default: false,
-        },
-      ]);
-
-      if (customInterval) {
-        const { saveInterval } = await inquirer.prompt([
-          {
-            type: 'number',
-            name: 'saveInterval',
-            message: 'Enter save interval in milliseconds:',
-            default: 30000,
-            validate: input => input > 0 || 'Save interval must be greater than 0',
-          },
-        ]);
-        this.config.metricsPersistenceSaveInterval = saveInterval;
-      }
-    }
+    this.config.promptLogsEnabled = promptLogsEnabled;
   }
 
   /**
@@ -655,8 +569,13 @@ To create a Bitbucket App Password:
       console.log(chalk.yellow('⚠ Warning: Failed to update .claude.json with MCP servers'));
     }
 
-    // Create or migrate to src/config/config.json (templates + branch rules)
-    await this.configGenerator.createOrMigrateConfigJson();
+    const configOverrides = {
+      promptLogs: { enabled: this.config.promptLogsEnabled },
+    };
+    if (this.config.claudeModel) {
+      configOverrides.claude = { model: this.config.claudeModel };
+    }
+    await this.configGenerator.createOrMigrateConfigJson(configOverrides);
 
     console.log(chalk.green('✓ Configuration files generated'));
   }

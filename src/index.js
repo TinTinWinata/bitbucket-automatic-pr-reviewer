@@ -1,32 +1,31 @@
-const express = require('express');
 const dotenv = require('dotenv');
+dotenv.config();
+
+const { getConfig } = require('./config/loader');
+const config = getConfig();
+const { createLogger } = require('./logger');
+createLogger(config.logging);
+const logger = require('./logger').default;
+
+const express = require('express');
 const crypto = require('crypto');
 const { processPullRequest } = require('./claude');
 const { register, metrics } = require('./metrics');
-const logger = require('./logger').default;
 const { BitbucketPayloadSchema } = require('./schemas');
 const CircuitBreaker = require('./circuit-breaker');
 const { shouldRunReview, shouldCreateReleaseNote } = require('./branch-matcher');
 
-dotenv.config();
-
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = config.server.port;
+const claudeCircuitBreaker = new CircuitBreaker(
+  config.circuitBreaker.failureThreshold,
+  config.circuitBreaker.resetTimeoutMs,
+);
 
-const failureThreshold = parseInt(process.env.CB_FAILURE_THRESHOLD || '3');
-const resetTimeout = parseInt(process.env.CB_RESET_TIMEOUT_MS || '30000');
-
-const claudeCircuitBreaker = new CircuitBreaker(failureThreshold, resetTimeout);
-
-// Security Configuration
-const BITBUCKET_WEBHOOK_SECRET = process.env.BITBUCKET_WEBHOOK_SECRET;
-const ALLOWED_WORKSPACE = process.env.ALLOWED_WORKSPACE || 'xriopteam'; // Default to xriopteam
-const NON_ALLOWED_USERS = process.env.NON_ALLOWED_USERS; // Comma-separated list of blocked display names
-
-// Event Filtering Configuration
-// Set to 'true' to only process PR creation events (ignore updates)
-// Set to 'false' to process all PR events (created + updated)
-const PROCESS_ONLY_CREATED = process.env.PROCESS_ONLY_CREATED === 'true';
+const BITBUCKET_WEBHOOK_SECRET = config.secrets.webhookSecret;
+const ALLOWED_WORKSPACE = config.bitbucket.allowedWorkspace;
+const NON_ALLOWED_USERS = config.bitbucket.nonAllowedUsers;
+const PROCESS_ONLY_CREATED = config.eventFilter.processOnlyCreated;
 
 // Queue System for Processing PRs (prevents branch conflicts)
 const reviewQueue = [];

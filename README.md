@@ -5,7 +5,7 @@ A simple Docker-based automation service that receives Bitbucket pull request we
 ## Features
 
 - 🔗 Receives Bitbucket PR creation webhooks
-- 🔒 Webhook signature validation & workspace restriction (xriopteam)
+- 🔒 Webhook signature validation & workspace restriction (yourworkspace)
 - 📦 Automatically clones repositories if not already present
 - 🔄 Updates existing repositories before processing
 - 🤖 Processes PR data with Claude CLI (`--dangerously-skip-permissions`)
@@ -297,24 +297,39 @@ The system automatically handles git operations:
    BITBUCKET_TOKEN=your-token-here
    ```
 
-## Environment Variables
+## Configuration
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `CLAUDE_MODEL` | No | `sonnet` | Claude model: `haiku`, `sonnet`, `opus` or GLM models (e.g., `glm-4.6`) |
-| `CLAUDE_TIMEOUT_CONFIG` | No | `10` | Claude analysis timeout in minutes |
-| `MAX_DIFF_SIZE_KB` | No | `200` | Maximum diff size in KB to include directly in prompt. If diff exceeds this, merge-base instructions will be added instead. Recommended: 50KB (conservative), 200KB (default), 400KB (aggressive) |
-| `BITBUCKET_TOKEN` | Yes | - | Bitbucket App Password or Token |
-| `BITBUCKET_USER` | Yes | - | Bitbucket username |
-| `BITBUCKET_WEBHOOK_SECRET` | Recommended | - | Webhook signature validation secret |
-| `ALLOWED_WORKSPACE` | No | `xriopteam` | Bitbucket workspace/organization slug to accept webhooks from |
-| `NON_ALLOWED_USERS` | No | - | Comma-separated list of Bitbucket display names to skip (e.g. "John Doe, Jane Smith"). If empty, reviews everyone. |
-| `PROCESS_ONLY_CREATED` | No | `false` | Set to `true` to only process PR creation events (ignore updates) |
-| `PORT` | No | `3000` | Server port |
-| `METRICS_PERSISTENCE_ENABLED` | No | `false` | Enable metrics persistence to survive restarts/rebuilds |
-| `METRICS_PERSISTENCE_TYPE` | No | `filesystem` | Storage type: `filesystem` or `sqlite` |
-| `METRICS_PERSISTENCE_PATH` | No | `./metrics-storage` | Path to store metrics data |
-| `METRICS_PERSISTENCE_SAVE_INTERVAL_MS` | No | `30000` | Save interval in milliseconds (30 seconds) |
+Non-secret app settings live in **`src/config/config.json`**. Environment variables override config.json (for Docker or per-environment overrides). Secrets are never stored in config and must be set via environment.
+
+### Secrets (environment only)
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `BITBUCKET_TOKEN` | Yes | Bitbucket App Password or Token |
+| `BITBUCKET_USER` | Yes | Bitbucket username |
+| `BITBUCKET_WEBHOOK_SECRET` | Recommended | Webhook signature validation secret |
+
+Also: `SHELL` and `NODE_ENV` are runtime/env-only.
+
+### App config (config.json with optional env overrides)
+
+Defaults are in `src/config/config.json`. You can override any of these via environment:
+
+| config.json path | Env override | Default | Description |
+|------------------|--------------|---------|-------------|
+| `server.port` | `PORT` | `3000` | Server port |
+| `claude.model` | `CLAUDE_MODEL` | `sonnet` | Claude model (e.g. haiku, sonnet, opus, glm-4.6) |
+| `claude.timeoutMinutes` | `CLAUDE_TIMEOUT_CONFIG` | `10` | Claude analysis timeout (minutes) |
+| `claude.maxDiffSizeKb` | `MAX_DIFF_SIZE_KB` | `200` | Max diff size in KB to include in prompt |
+| `bitbucket.allowedWorkspace` | `ALLOWED_WORKSPACE` | `yourworkspace` | Bitbucket workspace to accept webhooks from |
+| `bitbucket.nonAllowedUsers` | `NON_ALLOWED_USERS` | - | Comma-separated display names to skip |
+| `eventFilter.processOnlyCreated` | `PROCESS_ONLY_CREATED` | `false` | Only process PR creation events |
+| `metrics.persistence.*` | `METRICS_PERSISTENCE_*` | - | Metrics persistence (enabled, type, path, saveIntervalMs) |
+| `logging.*` | `LOG_*` | - | Log level, file retention, console/file toggles |
+| `circuitBreaker.*` | `CB_*` | - | Circuit breaker threshold and reset timeout |
+| `promptLogs.enabled` / `.path` | `PROMPT_LOGS_*` | `false`, `/app/prompt-logs` | Persist prompt logs to path |
+
+Templates and branch rules: `defaultTemplate`, `repositories`, `prReview`, `releaseNote` are also in config.json (no env overrides by default).
 
 ## Troubleshooting
 
@@ -377,7 +392,7 @@ The webhook endpoint is secured with two layers of protection:
 All webhook requests must include a valid HMAC-SHA256 signature in the `X-Hub-Signature` header. This ensures requests actually come from Bitbucket.
 
 ### 2. Workspace Restriction
-Only webhooks from the `xriopteam` Bitbucket workspace are accepted. This prevents unauthorized access from other organizations.
+Only webhooks from the `yourworkspace` Bitbucket workspace are accepted. This prevents unauthorized access from other organizations.
 
 ### Setup
 
@@ -389,7 +404,7 @@ Only webhooks from the `xriopteam` Bitbucket workspace are accepted. This preven
 2. **Add to `.env` file:**
    ```env
    BITBUCKET_WEBHOOK_SECRET=your-generated-secret
-   ALLOWED_WORKSPACE=xriopteam
+   ALLOWED_WORKSPACE=yourworkspace
    ```
 
 3. **Configure in Bitbucket:**
