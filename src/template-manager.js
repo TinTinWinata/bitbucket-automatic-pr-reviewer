@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const logger = require('./logger').default;
+const { getConfig } = require('./config/loader');
 
 /**
  * Template Manager - Handles loading and processing PR review templates
@@ -9,23 +10,7 @@ const logger = require('./logger').default;
 class TemplateManager {
   constructor() {
     this.templatesDir = path.join(__dirname, 'templates');
-    this.configPath = path.join(__dirname, 'config', 'config.json');
-    this.config = this.loadConfig();
-  }
-  /**
-   * Load template configuration
-   */
-  loadConfig() {
-    try {
-      if (fs.existsSync(this.configPath)) {
-        const configData = fs.readFileSync(this.configPath, 'utf8');
-        return JSON.parse(configData);
-      }
-      return { defaultTemplate: 'default', repositories: {} };
-    } catch (error) {
-      logger.warn('Failed to load template config, using defaults: ', error.message);
-      return { defaultTemplate: 'default', repositories: {} };
-    }
+    this.config = getConfig();
   }
 
   /**

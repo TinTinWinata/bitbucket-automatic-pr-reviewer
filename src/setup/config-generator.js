@@ -47,7 +47,7 @@ class ConfigGenerator {
       if (config.webhookSecret) {
         envContent += `BITBUCKET_WEBHOOK_SECRET=${config.webhookSecret}\n`;
       }
-      envContent += `ALLOWED_WORKSPACE=${config.workspace || 'xriopteam'}\n\n`;
+      envContent += `ALLOWED_WORKSPACE=${config.workspace || 'yourworkspace'}\n\n`;
 
       // Event Filtering
       envContent += '# Event Filtering\n';
@@ -155,7 +155,7 @@ class ConfigGenerator {
     console.log(`  Auth Method: ${config.authMethod || 'session'}`);
 
     console.log(chalk.yellow('\nBitbucket Configuration:'));
-    console.log(`  Workspace: ${config.workspace || 'xriopteam'}`);
+    console.log(`  Workspace: ${config.workspace || 'yourworkspace'}`);
     console.log(`  User: ${config.bitbucketUser || 'Not set'}`);
     console.log(`  Email: ${config.bitbucketUserEmail || 'Not set'}`);
     console.log(`  Token: ${config.bitbucketToken ? '✓ Set' : '✗ Not set'}`);
@@ -166,12 +166,8 @@ class ConfigGenerator {
     console.log(`  Non-Allowed Users: ${config.nonAllowedUsers || 'None (all users allowed)'}`);
     console.log(`  Webhook Secret: ${config.webhookSecret ? '✓ Set' : '✗ Not set'}`);
 
-    console.log(chalk.yellow('\nMetrics Persistence Configuration:'));
-    console.log(`  Enabled: ${config.metricsPersistenceEnabled ? 'Yes' : 'No'}`);
-    if (config.metricsPersistenceEnabled) {
-      console.log(`  Type: ${config.metricsPersistenceType || 'filesystem'}`);
-      console.log(`  Path: ${config.metricsPersistencePath || './metrics-storage'}`);
-    }
+    console.log(chalk.yellow('\nPrompt logs:'));
+    console.log(`  Enabled: ${config.promptLogsEnabled ? 'Yes' : 'No'}`);
 
     console.log(chalk.cyan('\n' + '─'.repeat(50)));
   }
@@ -228,7 +224,7 @@ class ConfigGenerator {
   }
 
   /**
-   * Default app config (templates + branch rules). Used when creating or migrating to config.json.
+   * Default app config (templates + branch rules + server, claude, etc.). Used when creating or migrating to config.json.
    */
   getDefaultAppConfig() {
     return {
@@ -244,16 +240,87 @@ class ConfigGenerator {
         targetBranchPatterns: ['^release-'],
         sourceBranchPatterns: [],
       },
+      server: {
+        port: 3000,
+      },
+      claude: {
+        model: 'sonnet',
+        timeoutMinutes: 10,
+        maxDiffSizeKb: 200,
+      },
+      bitbucket: {
+        allowedWorkspace: 'yourworkspace',
+        nonAllowedUsers: '',
+      },
+      eventFilter: {
+        processOnlyCreated: false,
+      },
+      metrics: {
+        persistence: {
+          enabled: false,
+          type: 'filesystem',
+          path: '/app/metrics-storage',
+          saveIntervalMs: 30000,
+        },
+      },
+      logging: {
+        level: 'info',
+        fileRetentionDays: 30,
+        maxFileSize: '20m',
+        enableConsole: true,
+        enableFile: true,
+      },
+      circuitBreaker: {
+        failureThreshold: 3,
+        resetTimeoutMs: 30000,
+      },
+      promptLogs: {
+        enabled: false,
+        path: '/app/prompt-logs',
+      },
     };
   }
 
   /**
-   * Create or migrate to src/config/config.json. If template-config.json exists, merge it and add
-   * prReview/releaseNote; otherwise create default config.json.
+   * Deep-merge defaults into config: for each key in defaults, set config[key] if missing or undefined.
+   * Nested objects are merged recursively. Does not mutate defaults.
    */
-  async createOrMigrateConfigJson() {
+  mergeConfigWithDefaults(config, defaults) {
+    const result = { ...config };
+    for (const key of Object.keys(defaults)) {
+      const defaultVal = defaults[key];
+      const currentVal = result[key];
+      if (currentVal === undefined || currentVal === null) {
+        result[key] =
+          defaultVal && typeof defaultVal === 'object' && !Array.isArray(defaultVal)
+            ? JSON.parse(JSON.stringify(defaultVal))
+            : defaultVal;
+      } else if (
+        defaultVal &&
+        typeof defaultVal === 'object' &&
+        !Array.isArray(defaultVal) &&
+        currentVal &&
+        typeof currentVal === 'object' &&
+        !Array.isArray(currentVal)
+      ) {
+        result[key] = this.mergeConfigWithDefaults(currentVal, defaultVal);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Create or migrate to src/config/config.json. If template-config.json exists, migrate from it.
+   * Else if config.json exists, load and merge defaults. Else if config.json.example exists, use
+   * it as template and merge defaults; otherwise use getDefaultAppConfig(). Optional overrides
+   * (e.g. { promptLogs: { enabled: true } }) are merged in before writing. Writes config.json
+   * (gitignored); config.json.example is the committed template.
+   * @param {Object} [overrides] - Optional overrides to merge into config (e.g. from setup wizard)
+   */
+  async createOrMigrateConfigJson(overrides = {}) {
     const configDir = path.join(this.projectRoot, 'src', 'config');
     const configPath = path.join(configDir, 'config.json');
+    const examplePath = path.join(configDir, 'config.json.example');
     const legacyPath = path.join(configDir, 'template-config.json');
 
     await fs.ensureDir(configDir);
@@ -281,21 +348,39 @@ class ConfigGenerator {
       }
     } else if (await fs.pathExists(configPath)) {
       try {
-        config = await fs.readJSON(configPath);
-        const defaults = this.getDefaultAppConfig();
-        if (!config.prReview) config.prReview = defaults.prReview;
-        if (!config.releaseNote) config.releaseNote = defaults.releaseNote;
+        const loaded = await fs.readJSON(configPath);
+        config = this.mergeConfigWithDefaults(loaded, this.getDefaultAppConfig());
       } catch (err) {
         console.error(chalk.red('✗ Failed to read config.json:'), err.message);
+        config = this.getDefaultAppConfig();
+      }
+    } else if (await fs.pathExists(examplePath)) {
+      try {
+        const loaded = await fs.readJSON(examplePath);
+        config = this.mergeConfigWithDefaults(loaded, this.getDefaultAppConfig());
+      } catch (err) {
+        console.error(chalk.red('✗ Failed to read config.json.example:'), err.message);
         config = this.getDefaultAppConfig();
       }
     } else {
       config = this.getDefaultAppConfig();
     }
 
+    // Apply wizard/setup overrides (e.g. promptLogs.enabled)
+    for (const key of Object.keys(overrides)) {
+      if (overrides[key] && typeof overrides[key] === 'object' && !Array.isArray(overrides[key])) {
+        config[key] = { ...(config[key] || {}), ...overrides[key] };
+      }
+    }
+
+    const configExistedBefore = await fs.pathExists(configPath);
     await fs.writeJSON(configPath, config, { spaces: 2 });
-    console.log(chalk.green('✓ config.json ready (src/config/config.json)'));
-    return true;
+    console.log(
+      chalk.green(
+        `✓ config.json ${configExistedBefore ? 'updated' : 'created'}: ${path.resolve(configPath)}`,
+      ),
+    );
+    return configPath;
   }
 
   /**

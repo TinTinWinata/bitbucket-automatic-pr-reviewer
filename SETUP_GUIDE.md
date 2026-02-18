@@ -6,11 +6,22 @@ The PR Automation service now includes an interactive setup wizard that simplifi
 
 ### Option 1: Interactive Setup (Recommended)
 
-Run the setup wizard and follow the prompts:
+**Run the wizard from the project root** (where `package.json` lives):
 
 ```bash
 npm run setup
 ```
+
+**What the wizard does (in order):**
+1. **Prerequisites** – Checks Node.js, Docker, and that you're in the project directory.
+2. **Claude auth** – Asks how to authenticate (session, API key, or GLM).
+3. **Bitbucket** – Token, user, workspace.
+4. **Server** – Port, event filter, webhook secret, non-allowed users.
+5. **Review** – Shows a summary and asks for confirmation.
+6. **Generate files** – Writes `.env`, updates `claude-config/.claude.json`, then **creates or updates `src/config/config.json`** (from `config.json.example` if `config.json` is missing, or merges in new defaults if it exists). The path used is `./src/config/config.json` relative to your current working directory.
+7. **Docker** – Optionally builds and starts containers.
+
+**Note:** `src/config/config.json` is gitignored. After setup you should see a line like `✓ config.json created: /absolute/path/to/repo/src/config/config.json`. If you don't see it, run `npm run setup` from the repo root and check that path.
 
 The wizard will guide you through:
 - ✅ Prerequisites checking (Node.js, Docker, Claude CLI)
@@ -55,21 +66,19 @@ If you prefer manual setup, follow the [original README instructions](./README.m
 - **Port**: Default 3000 (customizable)
 - **Event Filtering**: Process only PR creation vs all events
 - **Webhook Security**: Optional signature validation with auto-generated secrets
-- **Workspace**: Your Bitbucket workspace (default: xriopteam)
+- **Workspace**: Your Bitbucket workspace (default: yourworkspace)
 
 ## Configuration Files Generated
 
 The setup wizard creates:
 
-### `.env` - Environment Configuration
+### `.env` - Secrets and optional overrides
 ```env
-PORT=3000
-CLAUDE_MODEL=sonnet
 BITBUCKET_TOKEN=your-token
+BITBUCKET_USER=your-username
 BITBUCKET_WEBHOOK_SECRET=your-secret
-ALLOWED_WORKSPACE=your-workspace
-PROCESS_ONLY_CREATED=false
 ```
+Other app settings (port, model, workspace, etc.) are in `src/config/config.json`. You can still override them via env (e.g. `PORT=3000`, `CLAUDE_MODEL=sonnet`) if needed.
 
 ### `claude-config/.claude.json` - Claude Configuration
 Generated based on your chosen authentication method.
@@ -77,11 +86,20 @@ Generated based on your chosen authentication method.
 ### `.mcp.json` - MCP Server Configuration
 Bitbucket integration settings.
 
+### Configuration: config.json and environment
+
+**Single source of truth:** Non-secret app settings live in `src/config/config.json`. Environment variables override config.json (useful for Docker or per-environment overrides). Secrets are never stored in config.json and must be set via environment (e.g. `.env` or docker-compose).
+
+**Secrets (env only):** `BITBUCKET_TOKEN`, `BITBUCKET_USER`, `BITBUCKET_WEBHOOK_SECRET`. Also `SHELL` and `NODE_ENV` are runtime/env-only.
+
+**config.json** holds: server (port), claude (model, timeoutMinutes, maxDiffSizeKb), bitbucket (allowedWorkspace, nonAllowedUsers), eventFilter (processOnlyCreated), metrics (persistence), logging, circuitBreaker, promptLogs (enabled, path), plus defaultTemplate, repositories, prReview, releaseNote. Any of these can be overridden by the corresponding env var (e.g. `PORT`, `CLAUDE_MODEL`, `ALLOWED_WORKSPACE`). See README "Configuration" for the full list.
+
 ### `src/config/config.json` - App configuration (templates + branch rules)
 Created or migrated by the setup wizard. Contains:
 - **defaultTemplate** and **repositories**: which PR review template to use per repo.
 - **prReview**: when to enqueue a PR review job (empty target patterns = all PRs).
 - **releaseNote**: when to enqueue a release-note job (e.g. target branch `^release-`).
+- **server**, **claude**, **bitbucket**, **eventFilter**, **metrics**, **logging**, **circuitBreaker**, **promptLogs**: app settings (see file for defaults).
 
 Edit this file to customize branch rules or template mapping. Restart the service after changes.
 

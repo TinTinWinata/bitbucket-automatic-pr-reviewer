@@ -187,7 +187,7 @@ class ClaudeAuthHandler {
   getAvailableModels() {
     return {
       claude: ['sonnet', 'haiku', 'opus'],
-      glm: ['glm-4.6', 'glm-4', 'glm-3-turbo'],
+      glm: ['glm-4.6', 'glm-4', 'glm-3-turbo', 'glm-4.7'],
     };
   }
 

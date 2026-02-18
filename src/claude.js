@@ -4,9 +4,7 @@ const { ensureProjectExists, getDiffFromMergeBase } = require('./git');
 const { metrics } = require('./metrics');
 const TemplateManager = require('./template-manager');
 const logger = require('./logger').default;
-
-const MAX_DIFF_SIZE_KB = parseInt(process.env.MAX_DIFF_SIZE_KB) || 200; // 200KB
-const MAX_DIFF_SIZE = MAX_DIFF_SIZE_KB * 1024; // Convert KB to bytes
+const { getConfig } = require('./config/loader');
 
 /**
  * Normalize queue item or legacy prData to { prData, type }.
@@ -41,11 +39,20 @@ async function runReleaseNoteFlow(prData) {
 
   const templateManager = new TemplateManager();
   const prompt = templateManager.getReleaseNotePrompt(prData);
-  const promptFile = path.join('/tmp', `release-note-${Date.now()}.txt`);
+  const promptLogs = getConfig().promptLogs || {};
+  const promptDir = promptLogs.enabled && promptLogs.path ? promptLogs.path : '/tmp';
+  if (promptLogs.enabled && promptLogs.path) {
+    fs.mkdirSync(promptDir, { recursive: true });
+  }
+  const promptFile = path.join(promptDir, `release-note-${Date.now()}.txt`);
   fs.writeFileSync(promptFile, prompt);
 
-  const model = process.env.CLAUDE_MODEL || 'sonnet';
-  let timeoutMinutes = parseInt(process.env.CLAUDE_TIMEOUT_CONFIG, 10);
+  const claudeConfig = getConfig().claude || {};
+  const model = claudeConfig.model || 'sonnet';
+
+  logger.info(`Running claude process with model selected: ${model}`);
+
+  let timeoutMinutes = parseInt(claudeConfig.timeoutMinutes, 10);
   if (Number.isNaN(timeoutMinutes) || timeoutMinutes <= 0) timeoutMinutes = 10;
 
   const env = {
@@ -92,7 +99,9 @@ async function runReleaseNoteFlow(prData) {
     logger.info('✓ Release note Claude run completed');
     return { success: true, response: result.stdout };
   } finally {
-    if (fs.existsSync(promptFile)) fs.unlinkSync(promptFile);
+    if (!promptLogs.enabled && fs.existsSync(promptFile)) {
+      fs.unlinkSync(promptFile);
+    }
   }
 }
 
@@ -152,12 +161,14 @@ async function processPullRequest(queueItemOrPrData) {
       );
 
       if (diffResult.success) {
-        diffTooLarge = diffResult.size > MAX_DIFF_SIZE;
+        const maxDiffSizeKb = getConfig().claude.maxDiffSizeKb || 200;
+        const maxDiffSizeBytes = maxDiffSizeKb * 1024;
+        diffTooLarge = diffResult.size > maxDiffSizeBytes;
         const diffSizeKB = (diffResult.size / 1024).toFixed(2);
         const estimatedTokens = Math.round(diffResult.size / 4); // Rough estimate: 1 token ≈ 4 chars
 
         logger.info(
-          `Diff retrieved: ${diffSizeKB} KB (~${estimatedTokens.toLocaleString()} tokens, limit: ${MAX_DIFF_SIZE_KB}KB)`,
+          `Diff retrieved: ${diffSizeKB} KB (~${estimatedTokens.toLocaleString()} tokens, limit: ${maxDiffSizeKb}KB)`,
         );
         logger.info(
           `Diff handling: ${diffTooLarge ? 'too large, will use merge-base instructions' : 'will include directly in prompt'}`,
@@ -179,19 +190,25 @@ async function processPullRequest(queueItemOrPrData) {
       destinationBranch: prData.destinationBranch,
     });
 
-    // Write prompt to temporary file
-    const promptFile = path.join('/tmp', `pr-review-${Date.now()}.txt`);
+    // Write prompt to file (persisted or temp per config)
+    const promptLogs = getConfig().promptLogs || {};
+    const promptDir = promptLogs.enabled && promptLogs.path ? promptLogs.path : '/tmp';
+    if (promptLogs.enabled && promptLogs.path) {
+      fs.mkdirSync(promptDir, { recursive: true });
+    }
+    const promptFile = path.join(promptDir, `pr-review-${Date.now()}.txt`);
     fs.writeFileSync(promptFile, prompt);
 
     try {
       logger.info('Executing Claude CLI...');
       const startTime = Date.now();
 
-      // Get model from env or default to sonnet
-      const model = process.env.CLAUDE_MODEL || 'sonnet';
+      const claudeConfig = getConfig().claude || {};
+      const model = claudeConfig.model || 'sonnet';
 
-      // Configure timeout from environment (in minutes). Default to 10 if invalid/not set.
-      let timeoutMinutes = parseInt(process.env.CLAUDE_TIMEOUT_CONFIG);
+      logger.info(`Running claude process with model selected: ${model}`);
+
+      let timeoutMinutes = parseInt(claudeConfig.timeoutMinutes, 10);
       if (Number.isNaN(timeoutMinutes) || timeoutMinutes <= 0) {
         timeoutMinutes = 10;
       }
@@ -287,7 +304,9 @@ async function processPullRequest(queueItemOrPrData) {
         logger.warn(`Claude CLI warnings: ${stderr}`);
       }
 
-      fs.unlinkSync(promptFile);
+      if (!promptLogs.enabled && fs.existsSync(promptFile)) {
+        fs.unlinkSync(promptFile);
+      }
 
       // Extract metrics from JSON output
       let isLgtm = false;
@@ -360,8 +379,8 @@ async function processPullRequest(queueItemOrPrData) {
         duration: duration,
       };
     } catch (error) {
-      // Clean up prompt file on error
-      if (fs.existsSync(promptFile)) {
+      // Clean up prompt file on error (only if not persisting)
+      if (!promptLogs.enabled && fs.existsSync(promptFile)) {
         fs.unlinkSync(promptFile);
       }
 
@@ -371,7 +390,8 @@ async function processPullRequest(queueItemOrPrData) {
         error.signal === 'SIGTERM' ||
         /timed out after \d+ minutes/.test(error.message)
       ) {
-        let timeoutMinutes = parseInt(process.env.CLAUDE_TIMEOUT_CONFIG, 10);
+        const claudeCfg = getConfig().claude || {};
+        let timeoutMinutes = parseInt(claudeCfg.timeoutMinutes, 10);
         if (Number.isNaN(timeoutMinutes) || timeoutMinutes <= 0) {
           timeoutMinutes = 10;
         }
