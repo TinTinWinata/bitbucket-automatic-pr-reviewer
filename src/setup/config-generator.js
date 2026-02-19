@@ -7,6 +7,117 @@ class ConfigGenerator {
     this.projectRoot = process.cwd();
     this.envPath = path.join(this.projectRoot, '.env');
     this.claudeConfigPath = path.join(this.projectRoot, 'claude-config', '.claude.json');
+    this.configJsonPath = path.join(this.projectRoot, 'src', 'config', 'config.json');
+    this.dockerComposePath = path.join(this.projectRoot, 'docker-compose.yml');
+  }
+
+  /**
+   * Validate at the beginning whether we can recreate configuration (permissions, paths).
+   * If we cannot, the setup wizard should not proceed.
+   * @returns {{ canProceed: boolean, errors: string[], warnings: string[] }}
+   */
+  async validateCanRecreateConfiguration() {
+    const errors = [];
+    const warnings = [];
+
+    try {
+      // Check project root is writable
+      const testFile = path.join(this.projectRoot, '.setup-write-test');
+      try {
+        await fs.writeFile(testFile, '');
+        await fs.remove(testFile);
+      } catch (err) {
+        errors.push(`Project root is not writable: ${err.message}`);
+      }
+
+      // Check we can create/write to src/config
+      const configDir = path.join(this.projectRoot, 'src', 'config');
+      try {
+        await fs.ensureDir(configDir);
+        const testConfig = path.join(configDir, '.setup-write-test');
+        await fs.writeFile(testConfig, '');
+        await fs.remove(testConfig);
+      } catch (err) {
+        errors.push(`Cannot create or write to src/config: ${err.message}`);
+      }
+
+      // Check package.json exists (project root)
+      const packageJsonPath = path.join(this.projectRoot, 'package.json');
+      if (!(await fs.pathExists(packageJsonPath))) {
+        errors.push('package.json not found. Please run setup from the project root.');
+      }
+    } catch (err) {
+      errors.push(`Validation failed: ${err.message}`);
+    }
+
+    const canProceed = errors.length === 0;
+    return { canProceed, errors, warnings };
+  }
+
+  /**
+   * Check if config.json or docker-compose.yml already exist.
+   * @returns {{ hasConfigJson: boolean, hasDockerCompose: boolean, configPath: string, dockerComposePath: string }}
+   */
+  async checkExistingConfigAndDocker() {
+    const hasConfigJson = await fs.pathExists(this.configJsonPath);
+    const hasDockerCompose = await fs.pathExists(this.dockerComposePath);
+    return {
+      hasConfigJson,
+      hasDockerCompose,
+      configPath: this.configJsonPath,
+      dockerComposePath: this.dockerComposePath,
+    };
+  }
+
+  /**
+   * Backup and remove existing config.json after user confirmation.
+   * @returns {Promise<boolean>} true if cleared or did not exist
+   */
+  async backupAndRemoveConfigJson() {
+    try {
+      if (!(await fs.pathExists(this.configJsonPath))) {
+        return true;
+      }
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const backupPath = path.join(
+        path.dirname(this.configJsonPath),
+        `config.json.backup.${timestamp}`,
+      );
+      await fs.copy(this.configJsonPath, backupPath);
+      await fs.remove(this.configJsonPath);
+      console.log(
+        chalk.yellow(`⚠ Backed up config.json to ${path.basename(backupPath)} and removed.`),
+      );
+      return true;
+    } catch (err) {
+      console.error(chalk.red('✗ Failed to backup/remove config.json:'), err.message);
+      return false;
+    }
+  }
+
+  /**
+   * Backup and remove existing docker-compose.yml (uses same path as DockerHelper).
+   * @returns {Promise<boolean>} true if cleared or did not exist
+   */
+  async backupAndRemoveDockerCompose() {
+    try {
+      if (!(await fs.pathExists(this.dockerComposePath))) {
+        return true;
+      }
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const backupPath = path.join(this.projectRoot, `docker-compose.yml.backup.${timestamp}`);
+      await fs.copy(this.dockerComposePath, backupPath);
+      await fs.remove(this.dockerComposePath);
+      console.log(
+        chalk.yellow(
+          `⚠ Backed up docker-compose.yml to ${path.basename(backupPath)} and removed.`,
+        ),
+      );
+      return true;
+    } catch (err) {
+      console.error(chalk.red('✗ Failed to backup/remove docker-compose.yml:'), err.message);
+      return false;
+    }
   }
 
   /**

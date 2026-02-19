@@ -689,12 +689,89 @@ To create a Bitbucket App Password:
   }
 
   /**
+   * Validate we can recreate configuration; if not, warn and exit (do not enter setup).
+   */
+  async validateRecreateConfiguration() {
+    const result = await this.configGenerator.validateCanRecreateConfiguration();
+    if (!result.canProceed) {
+      console.error(chalk.red('\n❌ Cannot proceed with setup configuration:\n'));
+      result.errors.forEach(err => console.error(chalk.red(`   • ${err}`)));
+      if (result.warnings.length) {
+        result.warnings.forEach(w => console.log(chalk.yellow(`   ⚠ ${w}`)));
+      }
+      console.log(
+        chalk.yellow(
+          '\n⚠ Fix the issues above and run the setup again. Do not continue into the setup wizard until these are resolved.\n',
+        ),
+      );
+      process.exit(1);
+    }
+  }
+
+  /**
+   * If config.json or docker-compose exist, ask user to backup and clear before continuing.
+   */
+  async confirmClearExistingConfigIfAny() {
+    const existing = await this.configGenerator.checkExistingConfigAndDocker();
+    if (!existing.hasConfigJson && !existing.hasDockerCompose) {
+      return;
+    }
+
+    const files = [];
+    if (existing.hasConfigJson) files.push('src/config/config.json');
+    if (existing.hasDockerCompose) files.push('docker-compose.yml');
+
+    console.log(chalk.yellow(`\n📁 Existing configuration file(s) found: ${files.join(', ')}`));
+    console.log(
+      chalk.gray(
+        'Re-running setup will overwrite these. You can backup and clear them now, or exit and keep them.\n',
+      ),
+    );
+
+    const { clearExisting } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'clearExisting',
+        message:
+          'Do you want to backup and clear these files so setup can recreate them? (Backups will be created in the same directory.)',
+        default: false,
+      },
+    ]);
+
+    if (!clearExisting) {
+      console.log(
+        chalk.yellow(
+          '\n⚠ Setup cancelled. Resolve or backup existing config/docker-compose manually, then run setup again.\n',
+        ),
+      );
+      process.exit(0);
+    }
+
+    if (existing.hasConfigJson) {
+      const ok = await this.configGenerator.backupAndRemoveConfigJson();
+      if (!ok) {
+        console.error(chalk.red('Cannot continue: failed to backup/remove config.json.'));
+        process.exit(1);
+      }
+    }
+    if (existing.hasDockerCompose) {
+      const ok = await this.configGenerator.backupAndRemoveDockerCompose();
+      if (!ok) {
+        console.error(chalk.red('Cannot continue: failed to backup/remove docker-compose.yml.'));
+        process.exit(1);
+      }
+    }
+  }
+
+  /**
    * Main setup flow
    */
   async run() {
     try {
       this.showWelcome();
+      await this.validateRecreateConfiguration();
       await this.checkPrerequisites();
+      await this.confirmClearExistingConfigIfAny();
       await this.setupClaudeAuth();
       await this.setupBitbucketConfig();
       await this.setupServerConfig();
