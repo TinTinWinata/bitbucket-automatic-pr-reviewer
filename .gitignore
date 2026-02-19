@@ -22,3 +22,5 @@ docker-compose.yml
 coverage/
 *.backup
 me/
+
+release-note-*
