@@ -24,6 +24,12 @@ const DEFAULT_CONFIG = {
   claude: { model: 'sonnet', timeoutMinutes: 10, maxDiffSizeKb: 200 },
   bitbucket: { allowedWorkspace: 'yourworkspace', nonAllowedUsers: '' },
   eventFilter: { processOnlyCreated: false },
+  manualTrigger: {
+    enabled: true,
+    requireMention: true,
+    keywords: ['review'],
+    botNames: [],
+  },
   metrics: {
     persistence: {
       enabled: false,
@@ -211,6 +217,16 @@ function getConfig() {
     bitbucketUser: process.env.BITBUCKET_USER,
     webhookSecret: process.env.BITBUCKET_WEBHOOK_SECRET,
   };
+  merged.manualTrigger = merged.manualTrigger || {};
+  if (!Array.isArray(merged.manualTrigger.keywords) || merged.manualTrigger.keywords.length === 0) {
+    merged.manualTrigger.keywords = ['review'];
+  }
+  if (!Array.isArray(merged.manualTrigger.botNames)) {
+    merged.manualTrigger.botNames = [];
+  }
+  if (merged.manualTrigger.botNames.length === 0 && merged.secrets.bitbucketUser) {
+    merged.manualTrigger.botNames = [merged.secrets.bitbucketUser];
+  }
   cachedConfig = merged;
   return cachedConfig;
 }

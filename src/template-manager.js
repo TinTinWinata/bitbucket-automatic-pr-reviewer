@@ -159,6 +159,9 @@ class TemplateManager {
       destinationBranch: prData.destinationBranch || '',
       repository: prData.repository || '',
       repoCloneUrl: prData.repoCloneUrl || '',
+      triggerType: prData.triggerType || 'automatic-webhook',
+      triggeredBy: prData.triggeredBy || '',
+      triggerComment: prData.triggerComment || '',
     };
 
     let prompt = this.substituteVariables(template, variables);

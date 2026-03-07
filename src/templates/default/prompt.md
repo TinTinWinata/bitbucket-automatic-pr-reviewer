@@ -7,6 +7,11 @@ Fetch PR details + file diffs from the given Bitbucket URL, safely switch to the
 **PR:**  
 `{{prUrl}}`
 
+**Trigger Context:**  
+- Type: `{{triggerType}}`  
+- Requested by: `{{triggeredBy}}`  
+- Comment: `{{triggerComment}}`
+
 ---
 
 ## Operating Rules
