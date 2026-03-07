@@ -26,6 +26,12 @@
   "eventFilter": {
     "processOnlyCreated": false
   },
+  "manualTrigger": {
+    "enabled": true,
+    "requireMention": true,
+    "keywords": ["review"],
+    "botNames": []
+  },
   "metrics": {
     "persistence": {
       "enabled": false,

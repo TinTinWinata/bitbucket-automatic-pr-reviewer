@@ -136,10 +136,10 @@ Returns the service status.
 ```
 POST /webhook/bitbucket/pr
 ```
-Receives Bitbucket pull request creation webhooks.
+Receives Bitbucket pull request webhooks.
 
 **Expected Headers:**
-- `x-event-key`: Should be `pullrequest:created`
+- `x-event-key`: `pullrequest:created`, `pullrequest:updated`, or `pullrequest:comment_created`
 
 **Response:**
 ```json
@@ -151,6 +151,21 @@ Receives Bitbucket pull request creation webhooks.
 }
 ```
 `enqueued` lists job types added to the queue (based on branch rules in `config.json`). One PR can enqueue both a review and a release-note job.
+
+### Manual Review Trigger via PR Comment
+
+When `manualTrigger.enabled` is true, users can request an on-demand review by posting a PR comment with:
+
+- a bot mention (from `manualTrigger.botNames`), and
+- a trigger keyword (from `manualTrigger.keywords`, default: `review`).
+
+Example:
+
+```text
+@review-bot review
+```
+
+Manual comment triggers enqueue a `review` job directly (they bypass `eventFilter.processOnlyCreated` and branch pattern filters for `prReview`).
 
 ## Customizing PR Review Templates
 
@@ -324,6 +339,10 @@ Defaults are in `src/config/config.json`. You can override any of these via envi
 | `bitbucket.allowedWorkspace` | `ALLOWED_WORKSPACE` | `yourworkspace` | Bitbucket workspace to accept webhooks from |
 | `bitbucket.nonAllowedUsers` | `NON_ALLOWED_USERS` | - | Comma-separated display names to skip |
 | `eventFilter.processOnlyCreated` | `PROCESS_ONLY_CREATED` | `false` | Only process PR creation events |
+| `manualTrigger.enabled` | - | `true` | Enable comment-based manual review trigger |
+| `manualTrigger.requireMention` | - | `true` | Require `@botName` mention in trigger comment |
+| `manualTrigger.keywords` | - | `["review"]` | Trigger words to start manual review |
+| `manualTrigger.botNames` | - | `[]` (auto-seeded from `BITBUCKET_USER` when empty) | Bot names recognized in mentions |
 | `metrics.persistence.*` | `METRICS_PERSISTENCE_*` | - | Metrics persistence (enabled, type, path, saveIntervalMs) |
 | `logging.*` | `LOG_*` | - | Log level, file retention, console/file toggles |
 | `circuitBreaker.*` | `CB_*` | - | Circuit breaker threshold and reset timeout |
