@@ -154,16 +154,24 @@ Receives Bitbucket pull request webhooks.
 
 ### Manual Review Trigger via PR Comment
 
-When `manualTrigger.enabled` is true, users can request an on-demand review by posting a PR comment with:
+When `manualTrigger.enabled` is true, users can request an on-demand review by posting a PR comment. The trigger fires if **either** condition matches:
 
-- a bot mention (from `manualTrigger.botNames`), and
-- a trigger keyword (from `manualTrigger.keywords`, default: `review`).
+1. **Prefix command**: Comment starts with `/review` (optionally followed by text).
+2. **Mention + keyword**: Comment mentions a configured bot (by ID or legacy name) and includes the keyword `review`.
 
-Example:
+Examples:
+
+```text
+/review
+/review please check this PR
+```
 
 ```text
 @review-bot review
+@{12345:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee} review this
 ```
+
+Bitbucket stores mentions in raw form as `@{workspace:uuid}`. Configure `manualTrigger.botIds` with these IDs (e.g. `12345:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee`) for reliable mention matching. The legacy `botNames` (e.g. `@review-bot`) still works when `BITBUCKET_USER` or `manualTrigger.botNames` is set.
 
 Manual comment triggers enqueue a `review` job directly (they bypass `eventFilter.processOnlyCreated` and branch pattern filters for `prReview`).
 
@@ -340,9 +348,10 @@ Defaults are in `src/config/config.json`. You can override any of these via envi
 | `bitbucket.nonAllowedUsers` | `NON_ALLOWED_USERS` | - | Comma-separated display names to skip |
 | `eventFilter.processOnlyCreated` | `PROCESS_ONLY_CREATED` | `false` | Only process PR creation events |
 | `manualTrigger.enabled` | - | `true` | Enable comment-based manual review trigger |
-| `manualTrigger.requireMention` | - | `true` | Require `@botName` mention in trigger comment |
-| `manualTrigger.keywords` | - | `["review"]` | Trigger words to start manual review |
-| `manualTrigger.botNames` | - | `[]` (auto-seeded from `BITBUCKET_USER` when empty) | Bot names recognized in mentions |
+| `manualTrigger.prefixCommand` | - | `"/review"` | Prefix command to trigger review (e.g. `/review anything`) |
+| `manualTrigger.keywords` | - | `["review"]` | Keywords required for the mention-based trigger |
+| `manualTrigger.botIds` | - | `[]` | Bitbucket account IDs for mentions (e.g. `12345:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee`) |
+| `manualTrigger.botNames` | - | `[]` (auto-seeded from `BITBUCKET_USER` when empty) | Legacy: display names for @mention matching |
 | `metrics.persistence.*` | `METRICS_PERSISTENCE_*` | - | Metrics persistence (enabled, type, path, saveIntervalMs) |
 | `logging.*` | `LOG_*` | - | Log level, file retention, console/file toggles |
 | `circuitBreaker.*` | `CB_*` | - | Circuit breaker threshold and reset timeout |

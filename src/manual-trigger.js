@@ -13,16 +13,40 @@ function escapeRegExp(text) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function textHasMention(text, botNames) {
-  const normalizedNames = normalizeList(botNames);
-  if (normalizedNames.length === 0) {
-    return false;
-  }
+/**
+ * Check if comment starts with /review prefix command (optionally followed by text).
+ * Matches: "/review", "/review ", "/review anything here"
+ */
+function textHasPrefixCommand(text, commandPrefix) {
+  const prefix = (commandPrefix || '/review').trim().toLowerCase();
+  if (!prefix) return false;
+  const escaped = escapeRegExp(prefix);
+  const regex = new RegExp(`^\\s*${escaped}(\\s|$)`, 'i');
+  return regex.test(text.trim());
+}
 
-  return normalizedNames.some(name => {
-    const mentionRegex = new RegExp(`(^|\\s)@${escapeRegExp(name)}(?=\\b|\\s|$)`, 'i');
-    return mentionRegex.test(text);
-  });
+/**
+ * Extract mention IDs from Bitbucket raw format: @{id} or @{workspace:id}
+ * Returns array of extracted IDs (lowercase for comparison).
+ */
+function extractMentionIds(text) {
+  const ids = [];
+  const regex = /@\{([^}]+)\}/g;
+  let m;
+  while ((m = regex.exec(text)) !== null) {
+    ids.push(String(m[1]).trim().toLowerCase());
+  }
+  return ids;
+}
+
+/**
+ * Check if text contains a mention of one of the configured bot IDs.
+ */
+function textHasBotMention(text, botIds) {
+  const ids = normalizeList(botIds);
+  if (ids.length === 0) return false;
+  const mentioned = extractMentionIds(text);
+  return mentioned.some(id => ids.includes(id));
 }
 
 function textHasKeyword(text, keywords) {
@@ -35,25 +59,41 @@ function textHasKeyword(text, keywords) {
   });
 }
 
+/**
+ * Parse manual review trigger. Returns true if EITHER:
+ * 1. Comment starts with /review prefix command
+ * 2. Comment mentions configured bot ID(s) AND contains keyword (e.g. "review")
+ */
 function parseManualReviewTrigger(commentText, config) {
   const text = String(commentText || '').trim();
   if (!text) {
     return { shouldTrigger: false, reason: 'empty-comment' };
   }
 
-  const requireMention = config?.requireMention !== false;
+  const prefixCommand = config?.prefixCommand ?? '/review';
   const keywords = config?.keywords || ['review'];
-  const botNames = config?.botNames || [];
+  const botIds = config?.botIds || [];
 
-  if (!textHasKeyword(text, keywords)) {
-    return { shouldTrigger: false, reason: 'missing-keyword' };
+  // Rule 1: /review prefix command
+  if (textHasPrefixCommand(text, prefixCommand)) {
+    return { shouldTrigger: true, reason: 'matched-prefix-command' };
   }
 
-  if (requireMention && !textHasMention(text, botNames)) {
+  // Rule 2: bot mention (by ID) + keyword
+  const hasBotMention = textHasBotMention(text, botIds);
+  const hasKeyword = textHasKeyword(text, keywords);
+
+  if (hasBotMention && hasKeyword) {
+    return { shouldTrigger: true, reason: 'matched-mention-keyword' };
+  }
+
+  if (!hasBotMention && !hasKeyword) {
+    return { shouldTrigger: false, reason: 'missing-prefix-and-mention-keyword' };
+  }
+  if (!hasBotMention) {
     return { shouldTrigger: false, reason: 'missing-mention' };
   }
-
-  return { shouldTrigger: true, reason: 'matched' };
+  return { shouldTrigger: false, reason: 'missing-keyword' };
 }
 
 function getCommentText(payload) {
@@ -79,5 +119,7 @@ module.exports = {
   getCommentText,
   getCommentAuthor,
   getCommentId,
-  normalizeList,
+  extractMentionIds,
+  textHasPrefixCommand,
+  textHasBotMention,
 };
