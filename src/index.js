@@ -271,6 +271,8 @@ app.post('/webhook/bitbucket/pr', validateBitbucketWebhook, async (req, res) => 
         });
       }
 
+      logger.info(`📝 Comment text: ${commentText}`);
+
       const triggerResult = parseManualReviewTrigger(commentText, MANUAL_TRIGGER);
       if (!triggerResult.shouldTrigger) {
         logger.info(`⏭️  Comment ignored: ${triggerResult.reason}`);

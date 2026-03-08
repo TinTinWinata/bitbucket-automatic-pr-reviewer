@@ -57,15 +57,15 @@ describe('webhook endpoint', () => {
     jest.dontMock('../src/branch-matcher');
   });
 
-  it('enqueues review for valid manual trigger comment', async () => {
-    const { app, _internal } = loadAppWithEnv({ BITBUCKET_USER: 'review-bot' });
+  it('enqueues review for /review prefix command', async () => {
+    const { app, _internal } = loadAppWithEnv();
     _internal.processedCommentTriggerIds.clear();
     const { processPullRequest } = require('../src/claude');
 
     const res = await request(app)
       .post('/webhook/bitbucket/pr')
       .set('x-event-key', 'pullrequest:comment_created')
-      .send(commentPayload());
+      .send(commentPayload({ comment: { id: 1000, content: { raw: '/review please' } } }));
 
     await new Promise(resolve => setTimeout(resolve, 0));
 
@@ -82,8 +82,46 @@ describe('webhook endpoint', () => {
     );
   });
 
-  it('ignores non-trigger comments', async () => {
-    const { app } = loadAppWithEnv({ BITBUCKET_USER: 'review-bot' });
+  it('enqueues review for mention + keyword (botIds)', async () => {
+    const { app, _internal } = loadAppWithEnv({
+      BITBUCKET_BOT_IDS: '12345:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+    });
+    _internal.processedCommentTriggerIds.clear();
+    const { processPullRequest } = require('../src/claude');
+
+    const res = await request(app)
+      .post('/webhook/bitbucket/pr')
+      .set('x-event-key', 'pullrequest:comment_created')
+      .send(
+        commentPayload({
+          comment: {
+            id: 1001,
+            content: {
+              raw: '@{12345:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee} review this',
+            },
+          },
+        }),
+      );
+
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(res.status).toBe(200);
+    expect(res.body.enqueued).toEqual(['review']);
+    expect(processPullRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'review',
+        prData: expect.objectContaining({
+          triggerType: 'manual-comment',
+          triggeredBy: 'Comment User',
+        }),
+      }),
+    );
+  });
+
+  it('ignores non-trigger comments (mention without keyword)', async () => {
+    const { app } = loadAppWithEnv({
+      BITBUCKET_BOT_IDS: '12345:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+    });
 
     const res = await request(app)
       .post('/webhook/bitbucket/pr')
@@ -92,7 +130,28 @@ describe('webhook endpoint', () => {
         commentPayload({
           comment: {
             id: 1002,
-            content: { raw: '@review-bot looks good to me' },
+            content: {
+              raw: '@{12345:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee} looks good to me',
+            },
+          },
+        }),
+      );
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toContain('Comment ignored');
+  });
+
+  it('ignores plain review without prefix or mention', async () => {
+    const { app } = loadAppWithEnv();
+
+    const res = await request(app)
+      .post('/webhook/bitbucket/pr')
+      .set('x-event-key', 'pullrequest:comment_created')
+      .send(
+        commentPayload({
+          comment: {
+            id: 1003,
+            content: { raw: 'review this please' },
           },
         }),
       );
@@ -102,10 +161,7 @@ describe('webhook endpoint', () => {
   });
 
   it('skips comment from NON_ALLOWED_USERS', async () => {
-    const { app } = loadAppWithEnv({
-      BITBUCKET_USER: 'review-bot',
-      NON_ALLOWED_USERS: 'Blocked User',
-    });
+    const { app } = loadAppWithEnv({ NON_ALLOWED_USERS: 'Blocked User' });
 
     const res = await request(app)
       .post('/webhook/bitbucket/pr')
@@ -136,15 +192,12 @@ describe('webhook endpoint', () => {
   });
 
   it('does not block manual trigger when PROCESS_ONLY_CREATED=true', async () => {
-    const { app } = loadAppWithEnv({
-      PROCESS_ONLY_CREATED: 'true',
-      BITBUCKET_USER: 'review-bot',
-    });
+    const { app } = loadAppWithEnv({ PROCESS_ONLY_CREATED: 'true' });
 
     const res = await request(app)
       .post('/webhook/bitbucket/pr')
       .set('x-event-key', 'pullrequest:comment_created')
-      .send(commentPayload({ comment: { id: 1005, content: { raw: '@review-bot review now' } } }));
+      .send(commentPayload({ comment: { id: 1005, content: { raw: '/review now' } } }));
 
     expect(res.status).toBe(200);
     expect(res.body.enqueued).toEqual(['review']);

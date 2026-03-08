@@ -28,9 +28,9 @@
   },
   "manualTrigger": {
     "enabled": true,
-    "requireMention": true,
+    "prefixCommand": "/review",
     "keywords": ["review"],
-    "botNames": []
+    "botIds": []
   },
   "metrics": {
     "persistence": {
