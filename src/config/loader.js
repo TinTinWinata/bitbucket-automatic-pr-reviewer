@@ -26,9 +26,9 @@ const DEFAULT_CONFIG = {
   eventFilter: { processOnlyCreated: false },
   manualTrigger: {
     enabled: true,
-    requireMention: true,
+    prefixCommand: '/review',
     keywords: ['review'],
-    botNames: [],
+    botIds: [],
   },
   metrics: {
     persistence: {
@@ -218,14 +218,19 @@ function getConfig() {
     webhookSecret: process.env.BITBUCKET_WEBHOOK_SECRET,
   };
   merged.manualTrigger = merged.manualTrigger || {};
+  if (!merged.manualTrigger.prefixCommand) {
+    merged.manualTrigger.prefixCommand = '/review';
+  }
   if (!Array.isArray(merged.manualTrigger.keywords) || merged.manualTrigger.keywords.length === 0) {
     merged.manualTrigger.keywords = ['review'];
   }
-  if (!Array.isArray(merged.manualTrigger.botNames)) {
-    merged.manualTrigger.botNames = [];
+  if (!Array.isArray(merged.manualTrigger.botIds)) {
+    merged.manualTrigger.botIds = [];
   }
-  if (merged.manualTrigger.botNames.length === 0 && merged.secrets.bitbucketUser) {
-    merged.manualTrigger.botNames = [merged.secrets.bitbucketUser];
+  if (process.env.BITBUCKET_BOT_IDS) {
+    merged.manualTrigger.botIds = process.env.BITBUCKET_BOT_IDS.split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
   }
   cachedConfig = merged;
   return cachedConfig;
