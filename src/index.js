@@ -34,10 +34,23 @@ const NON_ALLOWED_USERS = config.bitbucket.nonAllowedUsers;
 const PROCESS_ONLY_CREATED = config.eventFilter.processOnlyCreated;
 const MANUAL_TRIGGER = config.manualTrigger || {};
 
+/** Minutes beyond `claude.timeoutMinutes` before treating an in-flight job as stuck (git + overhead). */
+const PROCESSING_STALE_BUFFER_MINUTES = 5;
+
 // Queue System for Processing PRs (prevents branch conflicts)
 const reviewQueue = [];
-let isProcessing = false;
+/** @type {number | null} epoch ms when current item started; null when idle */
+let processingStartedAt = null;
 const processedCommentTriggerIds = new Set();
+
+function getProcessingStaleThresholdMs() {
+  const cfg = getConfig();
+  let timeoutMinutes = parseInt(cfg.claude?.timeoutMinutes, 10);
+  if (Number.isNaN(timeoutMinutes) || timeoutMinutes <= 0) {
+    timeoutMinutes = 10;
+  }
+  return (timeoutMinutes + PROCESSING_STALE_BUFFER_MINUTES) * 60 * 1000;
+}
 
 function getNonAllowedUsersList() {
   if (!NON_ALLOWED_USERS) return [];
@@ -94,11 +107,34 @@ function enqueueManualReview(prData) {
  * Process PR review queue sequentially to prevent branch conflicts
  */
 async function processQueue() {
-  if (isProcessing || reviewQueue.length === 0) {
-    return; // Already processing or queue is empty
+  if (reviewQueue.length === 0) {
+    return;
   }
 
-  isProcessing = true;
+  const staleThresholdMs = getProcessingStaleThresholdMs();
+  if (processingStartedAt !== null) {
+    const elapsedMs = Date.now() - processingStartedAt;
+    if (elapsedMs < staleThresholdMs) {
+      return;
+    }
+    logger.warn(
+      `⚠️  Queue worker was marked busy for ${Math.round(elapsedMs / 1000)}s (stale threshold ${Math.round(staleThresholdMs / 1000)}s = claude.timeoutMinutes + ${PROCESSING_STALE_BUFFER_MINUTES}m buffer); assuming stuck worker and resuming.`,
+    );
+    processingStartedAt = null;
+  }
+
+  if (!claudeCircuitBreaker.canAttempt()) {
+    const retryMs = config.circuitBreaker.resetTimeoutMs || 30000;
+    logger.error(
+      `🚫 Circuit breaker is OPEN. Deferring queue processing for ${retryMs}ms.`,
+    );
+    setTimeout(() => {
+      processQueue();
+    }, retryMs);
+    return;
+  }
+
+  processingStartedAt = Date.now();
   const queueItem = reviewQueue.shift(); // { prData, type: 'review' | 'create-release-note' }
 
   logger.info(
@@ -106,11 +142,6 @@ async function processQueue() {
   );
 
   try {
-    if (!claudeCircuitBreaker.canAttempt()) {
-      logger.error('🚫 Circuit breaker is OPEN. Skipping to avoid system overload.');
-      return;
-    }
-
     await processPullRequest(queueItem);
 
     logger.info(`✅ Claude ${queueItem.type} succeeded`);
@@ -118,10 +149,10 @@ async function processQueue() {
   } catch (error) {
     logger.error(`Error processing PR with Claude: ${error.message}`);
     claudeCircuitBreaker.recordFailure();
+  } finally {
+    processingStartedAt = null;
+    processQueue();
   }
-
-  isProcessing = false;
-  processQueue(); // Process next item in queue (if any)
 }
 
 // Middleware to parse JSON (but keep raw body for signature verification)
