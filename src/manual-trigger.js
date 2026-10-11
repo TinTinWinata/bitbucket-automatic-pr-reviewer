@@ -96,6 +96,25 @@ function parseManualReviewTrigger(commentText, config) {
   return { shouldTrigger: false, reason: 'missing-keyword' };
 }
 
+/**
+ * Parse manual release note trigger. Returns true if comment starts with
+ * the configured releaseNoteCommand prefix (default: /release-note).
+ */
+function parseManualReleaseNoteTrigger(commentText, config) {
+  const text = String(commentText || '').trim();
+  if (!text) {
+    return { shouldTrigger: false, reason: 'empty-comment' };
+  }
+
+  const releaseNoteCommand = config?.releaseNoteCommand ?? '/release-note';
+
+  if (textHasPrefixCommand(text, releaseNoteCommand)) {
+    return { shouldTrigger: true, reason: 'matched-prefix-command' };
+  }
+
+  return { shouldTrigger: false, reason: 'missing-prefix-command' };
+}
+
 function getCommentText(payload) {
   return payload?.comment?.content?.raw || '';
 }
@@ -116,6 +135,7 @@ function getCommentId(payload) {
 
 module.exports = {
   parseManualReviewTrigger,
+  parseManualReleaseNoteTrigger,
   getCommentText,
   getCommentAuthor,
   getCommentId,
