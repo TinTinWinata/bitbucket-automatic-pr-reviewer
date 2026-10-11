@@ -1,5 +1,6 @@
 const {
   parseManualReviewTrigger,
+  parseManualReleaseNoteTrigger,
   getCommentText,
   getCommentAuthor,
   getCommentId,
@@ -107,6 +108,58 @@ describe('manual-trigger', () => {
     it('textHasBotMention matches configured bot ID', () => {
       const text = '@{12345:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee} review';
       expect(textHasBotMention(text, ['12345:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'])).toBe(true);
+    });
+  });
+
+  describe('parseManualReleaseNoteTrigger', () => {
+    const releaseNoteConfig = { releaseNoteCommand: '/release-note' };
+
+    it('matches /release-note alone', () => {
+      const result = parseManualReleaseNoteTrigger('/release-note', releaseNoteConfig);
+      expect(result.shouldTrigger).toBe(true);
+      expect(result.reason).toBe('matched-prefix-command');
+    });
+
+    it('matches /release-note with trailing text', () => {
+      const result = parseManualReleaseNoteTrigger('/release-note for v1.2.3', releaseNoteConfig);
+      expect(result.shouldTrigger).toBe(true);
+    });
+
+    it('matches /release-note with leading whitespace', () => {
+      const result = parseManualReleaseNoteTrigger('  /release-note', releaseNoteConfig);
+      expect(result.shouldTrigger).toBe(true);
+    });
+
+    it('defaults to /release-note when releaseNoteCommand is not configured', () => {
+      const result = parseManualReleaseNoteTrigger('/release-note', {});
+      expect(result.shouldTrigger).toBe(true);
+    });
+
+    it('rejects /review (review command does not trigger release note)', () => {
+      const result = parseManualReleaseNoteTrigger('/review', releaseNoteConfig);
+      expect(result.shouldTrigger).toBe(false);
+      expect(result.reason).toBe('missing-prefix-command');
+    });
+
+    it('rejects empty comment', () => {
+      const result = parseManualReleaseNoteTrigger('', releaseNoteConfig);
+      expect(result.shouldTrigger).toBe(false);
+      expect(result.reason).toBe('empty-comment');
+    });
+
+    it('rejects plain text without the prefix', () => {
+      const result = parseManualReleaseNoteTrigger(
+        'please generate release note',
+        releaseNoteConfig,
+      );
+      expect(result.shouldTrigger).toBe(false);
+    });
+
+    it('respects a custom releaseNoteCommand', () => {
+      const result = parseManualReleaseNoteTrigger('/gen-release', {
+        releaseNoteCommand: '/gen-release',
+      });
+      expect(result.shouldTrigger).toBe(true);
     });
   });
 

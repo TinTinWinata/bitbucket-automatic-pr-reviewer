@@ -118,6 +118,31 @@ describe('webhook endpoint', () => {
     );
   });
 
+  it('enqueues create-release-note for /release-note prefix command', async () => {
+    const { app, _internal } = loadAppWithEnv();
+    _internal.processedCommentTriggerIds.clear();
+    const { processPullRequest } = require('../src/claude');
+
+    const res = await request(app)
+      .post('/webhook/bitbucket/pr')
+      .set('x-event-key', 'pullrequest:comment_created')
+      .send(commentPayload({ comment: { id: 2001, content: { raw: '/release-note' } } }));
+
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(res.status).toBe(200);
+    expect(res.body.enqueued).toEqual(['create-release-note']);
+    expect(processPullRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'create-release-note',
+        prData: expect.objectContaining({
+          triggerType: 'manual-comment',
+          triggeredBy: 'Comment User',
+        }),
+      }),
+    );
+  });
+
   it('ignores non-trigger comments (mention without keyword)', async () => {
     const { app } = loadAppWithEnv({
       BITBUCKET_BOT_IDS: '12345:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',

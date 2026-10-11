@@ -29,6 +29,7 @@
   "manualTrigger": {
     "enabled": true,
     "prefixCommand": "/review",
+    "releaseNoteCommand": "/release-note",
     "keywords": ["review"],
     "botIds": []
   },

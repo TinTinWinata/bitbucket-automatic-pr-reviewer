@@ -16,6 +16,7 @@ const CircuitBreaker = require('./circuit-breaker');
 const { shouldRunReview, shouldCreateReleaseNote } = require('./branch-matcher');
 const {
   parseManualReviewTrigger,
+  parseManualReleaseNoteTrigger,
   getCommentText,
   getCommentAuthor,
   getCommentId,
@@ -103,6 +104,11 @@ function enqueueManualReview(prData) {
   return ['review'];
 }
 
+function enqueueManualReleaseNote(prData) {
+  reviewQueue.push({ prData, type: 'create-release-note' });
+  return ['create-release-note'];
+}
+
 /**
  * Process PR review queue sequentially to prevent branch conflicts
  */
@@ -125,9 +131,7 @@ async function processQueue() {
 
   if (!claudeCircuitBreaker.canAttempt()) {
     const retryMs = config.circuitBreaker.resetTimeoutMs || 30000;
-    logger.error(
-      `🚫 Circuit breaker is OPEN. Deferring queue processing for ${retryMs}ms.`,
-    );
+    logger.error(`🚫 Circuit breaker is OPEN. Deferring queue processing for ${retryMs}ms.`);
     setTimeout(() => {
       processQueue();
     }, retryMs);
@@ -304,12 +308,14 @@ app.post('/webhook/bitbucket/pr', validateBitbucketWebhook, async (req, res) => 
 
       logger.info(`📝 Comment text: ${commentText}`);
 
-      const triggerResult = parseManualReviewTrigger(commentText, MANUAL_TRIGGER);
-      if (!triggerResult.shouldTrigger) {
-        logger.info(`⏭️  Comment ignored: ${triggerResult.reason}`);
+      const reviewTrigger = parseManualReviewTrigger(commentText, MANUAL_TRIGGER);
+      const releaseNoteTrigger = parseManualReleaseNoteTrigger(commentText, MANUAL_TRIGGER);
+
+      if (!reviewTrigger.shouldTrigger && !releaseNoteTrigger.shouldTrigger) {
+        logger.info(`⏭️  Comment ignored: ${reviewTrigger.reason}`);
         return res.status(200).json({
           message: 'Comment ignored (no matching manual trigger command)',
-          reason: triggerResult.reason,
+          reason: reviewTrigger.reason,
         });
       }
 
@@ -331,9 +337,15 @@ app.post('/webhook/bitbucket/pr', validateBitbucketWebhook, async (req, res) => 
         triggerComment: commentText,
       });
 
-      enqueued = enqueueManualReview(prData);
+      if (reviewTrigger.shouldTrigger) {
+        enqueued.push(...enqueueManualReview(prData));
+      }
+      if (releaseNoteTrigger.shouldTrigger) {
+        enqueued.push(...enqueueManualReleaseNote(prData));
+      }
+
       logger.info(
-        `✅ Manual review triggered for PR: ${prData.title} (queue size: ${reviewQueue.length})`,
+        `✅ Manual trigger for PR: ${prData.title} [${enqueued.join(', ')}] (queue size: ${reviewQueue.length})`,
       );
     } else {
       // User filtering for automatic PR events
@@ -423,6 +435,7 @@ module.exports = {
     buildPrData,
     enqueueAutoJobs,
     enqueueManualReview,
+    enqueueManualReleaseNote,
     shouldSkipUser,
     processedCommentTriggerIds,
   },
