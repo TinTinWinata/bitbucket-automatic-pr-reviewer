@@ -131,13 +131,8 @@ class ConfigGenerator {
       envContent += '# Server Configuration\n';
       envContent += `PORT=${config.port || 3000}\n\n`;
 
-      // Claude Model Configuration
-      envContent += '# Claude Model Configuration\n';
-      if (config.claudeProvider === 'glm') {
-        envContent += `CLAUDE_MODEL=${config.claudeModel || 'glm-4.6'}\n`;
-      } else {
-        envContent += `CLAUDE_MODEL=${config.claudeModel || 'sonnet'}\n`;
-      }
+      // Claude Configuration (model is set in src/config/config.json, not via env)
+      envContent += '# Claude Configuration\n';
       envContent += `CLAUDE_TIMEOUT_CONFIG=${config.claudeTimeout || 10}\n`;
       envContent += '# Maximum diff size in KB to include directly in prompt (default: 100KB)\n';
       envContent += '# If diff exceeds this, merge-base instructions will be added instead\n';
