@@ -13,6 +13,9 @@ const { processPullRequest } = require('./claude');
 const { register, metrics } = require('./metrics');
 const { BitbucketPayloadSchema, BitbucketCommentPayloadSchema } = require('./schemas');
 const CircuitBreaker = require('./circuit-breaker');
+const jobHistory = require('./job-history');
+const teamsAlert = require('./teams-alert');
+const { registerStatusRoutes } = require('./status-page');
 const { shouldRunReview, shouldCreateReleaseNote } = require('./branch-matcher');
 const {
   parseManualReviewTrigger,
@@ -145,14 +148,20 @@ async function processQueue() {
     `📋 Processing queue item: ${queueItem.prData.title} [${queueItem.type}] (${reviewQueue.length} remaining)`,
   );
 
+  const job = jobHistory.startJob(queueItem);
+
   try {
-    await processPullRequest(queueItem);
+    const result = await processPullRequest(queueItem);
 
     logger.info(`✅ Claude ${queueItem.type} succeeded`);
     claudeCircuitBreaker.recordSuccess();
+    jobHistory.finishJob(job, result);
+    teamsAlert.onJobSuccess();
   } catch (error) {
     logger.error(`Error processing PR with Claude: ${error.message}`);
     claudeCircuitBreaker.recordFailure();
+    jobHistory.failJob(job, error);
+    teamsAlert.onJobFailure(error, claudeCircuitBreaker.state === 'OPEN', queueItem.prData);
   } finally {
     processingStartedAt = null;
     processQueue();
@@ -238,6 +247,8 @@ function validateBitbucketWebhook(req, res, next) {
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'PR Automation service is running' });
 });
+
+registerStatusRoutes(app, { reviewQueue, circuitBreaker: claudeCircuitBreaker });
 
 // Prometheus metrics endpoint
 app.get('/metrics', async (req, res) => {

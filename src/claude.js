@@ -377,6 +377,10 @@ async function processPullRequest(queueItemOrPrData) {
         success: true,
         response: stdout,
         duration: duration,
+        isLgtm,
+        issueCount,
+        isReviewFailed,
+        failedReviewReason,
       };
     } catch (error) {
       // Clean up prompt file on error (only if not persisting)

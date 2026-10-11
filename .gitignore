@@ -2,6 +2,7 @@ node_modules/
 .env
 .mcp.json
 metrics.json
+metrics-storage/
 config.json
 npm-debug.log*
 yarn-debug.log*
