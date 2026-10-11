@@ -5,7 +5,8 @@ FROM node:20-alpine
 RUN apk add --no-cache git bash
 
 # Install Claude CLI globally
-RUN npm install -g @anthropic-ai/claude-code && \
+ARG CLAUDE_CODE_VERSION=latest
+RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION} && \
     npm cache clean --force
 
 # Set working directory
