@@ -157,7 +157,7 @@ Receives Bitbucket pull request webhooks.
 When `manualTrigger.enabled` is true, users can request an on-demand review by posting a PR comment. The trigger fires if **either** condition matches:
 
 1. **Prefix command**: Comment starts with `/review` (optionally followed by text).
-2. **Mention + keyword**: Comment mentions a configured bot (by ID or legacy name) and includes the keyword `review`.
+2. **Mention + keyword**: Comment mentions a configured bot ID and includes the keyword `review`.
 
 Examples:
 
@@ -167,13 +167,21 @@ Examples:
 ```
 
 ```text
-@review-bot review
 @{12345:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee} review this
 ```
 
-Bitbucket stores mentions in raw form as `@{workspace:uuid}`. Configure `manualTrigger.botIds` with these IDs (e.g. `12345:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee`) for reliable mention matching. The legacy `botNames` (e.g. `@review-bot`) still works when `BITBUCKET_USER` or `manualTrigger.botNames` is set.
+Bitbucket stores mentions in raw form as `@{workspace:uuid}`. Configure `manualTrigger.botIds` with these IDs (e.g. `12345:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee`) for reliable mention matching. You can also set `BITBUCKET_BOT_IDS` (comma-separated) in your environment.
 
 Manual comment triggers enqueue a `review` job directly (they bypass `eventFilter.processOnlyCreated` and branch pattern filters for `prReview`).
+
+A comment starting with `/release-note` (configurable via `manualTrigger.releaseNoteCommand`) enqueues a `create-release-note` job the same way.
+
+### Status Page
+```
+GET /
+GET /api/status
+```
+`/` is a dashboard that refreshes every 10 seconds: service health, Claude CLI version and auth mode, circuit breaker state, the running and waiting jobs, per-repository totals and the last 50 jobs. `/api/status` returns the same data as JSON. Job history is kept in `jobs.json` under `metrics.persistence.path` (last 200 jobs). Both routes return 404 to requests that arrive through a Cloudflare tunnel.
 
 ## Customizing PR Review Templates
 
@@ -331,6 +339,8 @@ Non-secret app settings live in **`src/config/config.json`**. Environment variab
 | `BITBUCKET_TOKEN` | Yes | Bitbucket App Password or Token |
 | `BITBUCKET_USER` | Yes | Bitbucket username |
 | `BITBUCKET_WEBHOOK_SECRET` | Recommended | Webhook signature validation secret |
+| `TEAMS_WEBHOOK_URL` | No | Microsoft Teams incoming webhook. Gets one card when reviews stop working (Claude auth or CLI failure, or circuit breaker open), a reminder every 24 h while down, and a card when a review succeeds again |
+| `STATUS_PAGE_URL` | No | Adds an "Open status page" button to the Teams cards |
 
 Also: `SHELL` and `NODE_ENV` are runtime/env-only.
 
@@ -341,7 +351,7 @@ Defaults are in `src/config/config.json`. You can override any of these via envi
 | config.json path | Env override | Default | Description |
 |------------------|--------------|---------|-------------|
 | `server.port` | `PORT` | `3000` | Server port |
-| `claude.model` | `CLAUDE_MODEL` | `sonnet` | Claude model (e.g. haiku, sonnet, opus, glm-4.6) |
+| `claude.model` | - | `sonnet` | Claude model (e.g. haiku, sonnet, opus, glm-4.6) |
 | `claude.timeoutMinutes` | `CLAUDE_TIMEOUT_CONFIG` | `10` | Claude analysis timeout (minutes) |
 | `claude.maxDiffSizeKb` | `MAX_DIFF_SIZE_KB` | `200` | Max diff size in KB to include in prompt |
 | `bitbucket.allowedWorkspace` | `ALLOWED_WORKSPACE` | `yourworkspace` | Bitbucket workspace to accept webhooks from |
@@ -349,9 +359,9 @@ Defaults are in `src/config/config.json`. You can override any of these via envi
 | `eventFilter.processOnlyCreated` | `PROCESS_ONLY_CREATED` | `false` | Only process PR creation events |
 | `manualTrigger.enabled` | - | `true` | Enable comment-based manual review trigger |
 | `manualTrigger.prefixCommand` | - | `"/review"` | Prefix command to trigger review (e.g. `/review anything`) |
+| `manualTrigger.releaseNoteCommand` | - | `"/release-note"` | Prefix command to trigger a release note |
 | `manualTrigger.keywords` | - | `["review"]` | Keywords required for the mention-based trigger |
-| `manualTrigger.botIds` | - | `[]` | Bitbucket account IDs for mentions (e.g. `12345:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee`) |
-| `manualTrigger.botNames` | - | `[]` (auto-seeded from `BITBUCKET_USER` when empty) | Legacy: display names for @mention matching |
+| `manualTrigger.botIds` | `BITBUCKET_BOT_IDS` | `[]` | Bitbucket account IDs for mentions (comma-separated in env) |
 | `metrics.persistence.*` | `METRICS_PERSISTENCE_*` | - | Metrics persistence (enabled, type, path, saveIntervalMs) |
 | `logging.*` | `LOG_*` | - | Log level, file retention, console/file toggles |
 | `circuitBreaker.*` | `CB_*` | - | Circuit breaker threshold and reset timeout |
@@ -392,6 +402,12 @@ git clone https://x-token-auth:YOUR_TOKEN@bitbucket.org/your-workspace/your-repo
 ### Restart service
 ```bash
 docker-compose restart
+```
+
+### Keep the Claude CLI up to date
+`update-claude-cli.sh` rebuilds the image with the newest `@anthropic-ai/claude-code` from npm (`CLAUDE_CODE_CHANNEL`, default `latest`) when it differs from the running CLI. It waits for an idle queue, swaps the image, smoke-tests the CLI, and rolls back to the previous image (with a Teams card) if the test fails. Run it from cron on the Docker host:
+```bash
+30 18 * * * /path/to/bitbucket-automatic-pr-reviewer/update-claude-cli.sh >> /path/to/bitbucket-automatic-pr-reviewer/logs/claude-cli-update.log 2>&1
 ```
 
 ### Rebuild after changes
