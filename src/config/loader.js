@@ -107,10 +107,8 @@ function applyEnvOverrides(config) {
     merged.server = merged.server || {};
     merged.server.port = parseInt(e.PORT, 10) || config.server?.port || 3000;
   }
-  if (e.CLAUDE_MODEL !== undefined && e.CLAUDE_MODEL !== '') {
-    merged.claude = merged.claude || {};
-    merged.claude.model = e.CLAUDE_MODEL;
-  }
+  // Note: claude.model is intentionally NOT overridable via env (CLAUDE_MODEL)
+  // or docker-compose. The model is sourced solely from config.json.
   if (e.CLAUDE_TIMEOUT_CONFIG !== undefined && e.CLAUDE_TIMEOUT_CONFIG !== '') {
     merged.claude = merged.claude || {};
     merged.claude.timeoutMinutes =
